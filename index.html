@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Tesla Madness 1998 - Music Update</title>
+    <title>Tesla Madness 1998 - Dynamic UI</title>
     
     <script type="importmap">
     {
@@ -92,14 +92,12 @@
             pointer-events: none;
             font-size: clamp(12px, 3.5vw, 16px);
             max-width: 40%;
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            gap: 5px;
         }
 
-        /* BUTTONS (Camera & Music) */
-        .hud-btn {
+        #camera-indicator {
+            position: absolute;
+            top: max(70px, calc(env(safe-area-inset-top) + 50px)); 
+            right: max(20px, env(safe-area-inset-right));
             background: rgba(0, 0, 0, 0.5);
             border: 2px solid #ffcc00;
             padding: 5px 8px;
@@ -109,15 +107,9 @@
             font-size: clamp(9px, 2.5vw, 12px);
             pointer-events: auto; 
             cursor: pointer;
+            z-index: 20;
             border-radius: 4px;
             white-space: nowrap;
-            margin-top: 5px;
-            text-shadow: 1px 1px 0 #000;
-        }
-        
-        .hud-btn.active {
-            background: rgba(255, 204, 0, 0.2);
-            box-shadow: 0 0 5px #ffcc00;
         }
 
         /* LOADING SCREEN */
@@ -161,14 +153,30 @@
             align-items: flex-end;
         }
 
-        /* LEFT: JOYSTICK */
-        #joystick-zone {
-            width: 40%; height: 200px;
+        /* SHARED ZONE STYLES */
+        .control-zone {
+            width: 45%; height: 250px;
             pointer-events: auto;
             touch-action: none;
             position: relative;
+            /* border: 1px solid rgba(255,255,255,0.1); Debugging border */
         }
-        .joystick-base {
+
+        /* TEXT HINTS */
+        .zone-hint {
+            position: absolute;
+            bottom: 20px;
+            color: rgba(255,255,255,0.3);
+            font-size: 12px;
+            pointer-events: none;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .hint-left { left: 0; }
+        .hint-right { right: 0; text-align: right; }
+
+        /* DYNAMIC VISUAL ELEMENTS */
+        .touch-feedback-base {
             position: absolute;
             width: 100px; height: 100px;
             background: rgba(255, 255, 255, 0.1);
@@ -178,64 +186,24 @@
             display: none;
             pointer-events: none;
         }
-        .joystick-knob {
+        
+        /* The inner circle (Knob or Jump button) */
+        .touch-feedback-knob {
             position: absolute;
-            width: 40px; height: 40px;
-            background: rgba(255, 204, 0, 0.8);
+            width: 50px; height: 50px;
+            background: rgba(255, 204, 0, 0.8); /* Yellow Theme */
             border-radius: 50%;
             transform: translate(-50%, -50%);
             left: 50%; top: 50%;
-        }
-        .joystick-hint {
-            position: absolute;
-            bottom: 20px; left: 0;
-            color: rgba(255,255,255,0.3);
-            font-size: 12px;
-            pointer-events: none;
+            box-shadow: 0 0 15px rgba(255, 204, 0, 0.6);
         }
 
-        /* RIGHT: PEDALS */
-        #pedal-zone {
-            width: 40%;
-            pointer-events: none;
-            display: flex;
-            flex-direction: row;
-            justify-content: flex-end;
-            align-items: flex-end;
-            gap: 15px;
+        /* Specialize Jump feedback slightly */
+        #jump-visual .touch-feedback-knob {
+            width: 80px; height: 80px; /* Larger hit area visual */
+            background: rgba(255, 204, 0, 0.6);
+            border: 2px solid #ffcc00;
         }
-
-        .control-btn {
-            pointer-events: auto;
-            background: rgba(255, 255, 255, 0.15);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
-            color: white;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            user-select: none;
-            touch-action: manipulation;
-            transition: transform 0.1s, background 0.1s;
-        }
-        .control-btn:active, .control-btn.active {
-            transform: scale(0.95);
-            color: black;
-        }
-
-        #btn-jump {
-            width: clamp(80px, 20vw, 110px);
-            height: clamp(80px, 20vw, 110px);
-            border-radius: 50%; 
-            font-size: clamp(14px, 4vw, 18px);
-            background: rgba(255, 50, 50, 0.3);
-            border-color: #ff3333;
-            margin-bottom: 10px;
-            margin-right: 10px;
-        }
-        #btn-jump:active { background: rgba(255, 50, 50, 0.7); }
 
     </style>
 </head>
@@ -263,21 +231,27 @@
     <div class="hud-stats">
         <div id="speed">0 KM/H</div>
         <div id="fps">60 FPS</div>
-        <!-- Buttons Group -->
-        <div id="camera-indicator" class="hud-btn">CAM: FAR CHASE</div>
-        <div id="music-indicator" class="hud-btn active">MUSIC: ON</div>
     </div>
+    
+    <!-- CAMERA BUTTON -->
+    <div id="camera-indicator">CAM: FAR CHASE</div>
 
     <!-- CONTROLS -->
     <div class="touch-controls">
-        <div id="joystick-zone">
-            <div class="joystick-hint">MOVE & STEER</div>
-            <div class="joystick-base" id="joy-base">
-                <div class="joystick-knob" id="joy-knob"></div>
+        <!-- LEFT: JOYSTICK -->
+        <div id="joystick-zone" class="control-zone">
+            <div class="zone-hint hint-left">MOVE & STEER</div>
+            <div class="touch-feedback-base" id="joy-visual">
+                <div class="touch-feedback-knob" id="joy-knob"></div>
             </div>
         </div>
-        <div id="pedal-zone">
-            <div class="control-btn" id="btn-jump">JUMP</div>
+        
+        <!-- RIGHT: DYNAMIC JUMP -->
+        <div id="jump-zone" class="control-zone">
+            <div class="zone-hint hint-right">TAP TO JUMP</div>
+            <div class="touch-feedback-base" id="jump-visual">
+                <div class="touch-feedback-knob"></div>
+            </div>
         </div>
     </div>
 
@@ -324,46 +298,100 @@
         let analogSteering = 0;
         let analogThrottle = 0; 
 
-        // --- JOYSTICK ---
-        const joystick = {
-            active: false, origin: { x: 0, y: 0 }, current: { x: 0, y: 0 }, maxDist: 50,
+        // --- CONTROLS LOGIC ---
+        const controls = {
             init: function() {
-                const zone = document.getElementById('joystick-zone');
-                const base = document.getElementById('joy-base');
-                const knob = document.getElementById('joy-knob');
-                zone.addEventListener('touchstart', (e) => {
-                    e.preventDefault(); const touch = e.changedTouches[0]; this.active = true;
-                    const rect = zone.getBoundingClientRect(); this.origin.x = touch.clientX - rect.left; this.origin.y = touch.clientY - rect.top;
-                    base.style.display = 'block'; base.style.left = this.origin.x + 'px'; base.style.top = this.origin.y + 'px'; knob.style.transform = `translate(-50%, -50%)`; 
-                    sfx.init(); sfx.playMusic(); // Init audio
+                // JOYSTICK (LEFT)
+                const joyZone = document.getElementById('joystick-zone');
+                const joyVisual = document.getElementById('joy-visual');
+                const joyKnob = document.getElementById('joy-knob');
+                
+                let joyActive = false;
+                let joyOrigin = {x:0, y:0};
+                const maxDist = 50;
+
+                joyZone.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const touch = e.changedTouches[0];
+                    joyActive = true;
+                    const rect = joyZone.getBoundingClientRect();
+                    joyOrigin.x = touch.clientX - rect.left;
+                    joyOrigin.y = touch.clientY - rect.top;
+                    
+                    joyVisual.style.display = 'block';
+                    joyVisual.style.left = joyOrigin.x + 'px';
+                    joyVisual.style.top = joyOrigin.y + 'px';
+                    joyKnob.style.transform = `translate(-50%, -50%)`;
+                    sfx.init();
                 }, { passive: false });
-                zone.addEventListener('touchmove', (e) => {
-                    if (!this.active) return; e.preventDefault(); const touch = e.changedTouches[0]; const rect = zone.getBoundingClientRect();
-                    let dx = (touch.clientX - rect.left) - this.origin.x; let dy = (touch.clientY - rect.top) - this.origin.y;
+
+                joyZone.addEventListener('touchmove', (e) => {
+                    if (!joyActive) return;
+                    e.preventDefault();
+                    const touch = e.changedTouches[0];
+                    const rect = joyZone.getBoundingClientRect();
+                    
+                    let dx = (touch.clientX - rect.left) - joyOrigin.x;
+                    let dy = (touch.clientY - rect.top) - joyOrigin.y;
+                    
                     const dist = Math.sqrt(dx*dx + dy*dy);
-                    if (dist > this.maxDist) { const angle = Math.atan2(dy, dx); dx = Math.cos(angle) * this.maxDist; dy = Math.sin(angle) * this.maxDist; }
-                    knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`; 
-                    analogSteering = -(dx / this.maxDist);
-                    analogThrottle = -(dy / this.maxDist); 
+                    if (dist > maxDist) {
+                        const angle = Math.atan2(dy, dx);
+                        dx = Math.cos(angle) * maxDist;
+                        dy = Math.sin(angle) * maxDist;
+                    }
+
+                    joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                    analogSteering = -(dx / maxDist);
+                    analogThrottle = -(dy / maxDist);
                 }, { passive: false });
-                const end = () => { this.active = false; base.style.display = 'none'; analogSteering = 0; analogThrottle = 0; };
-                zone.addEventListener('touchend', end); zone.addEventListener('touchcancel', end);
+
+                const endJoy = () => {
+                    joyActive = false;
+                    joyVisual.style.display = 'none';
+                    analogSteering = 0;
+                    analogThrottle = 0;
+                };
+                joyZone.addEventListener('touchend', endJoy);
+                joyZone.addEventListener('touchcancel', endJoy);
+
+                // DYNAMIC JUMP (RIGHT)
+                const jumpZone = document.getElementById('jump-zone');
+                const jumpVisual = document.getElementById('jump-visual');
+
+                jumpZone.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const touch = e.changedTouches[0];
+                    keys.space = true;
+                    sfx.init();
+                    if(window.navigator.vibrate) window.navigator.vibrate(10);
+
+                    // Show visual feedback at touch point
+                    const rect = jumpZone.getBoundingClientRect();
+                    const x = touch.clientX - rect.left;
+                    const y = touch.clientY - rect.top;
+                    
+                    jumpVisual.style.display = 'block';
+                    jumpVisual.style.left = x + 'px';
+                    jumpVisual.style.top = y + 'px';
+                }, { passive: false });
+
+                const endJump = (e) => {
+                    e.preventDefault();
+                    keys.space = false;
+                    jumpVisual.style.display = 'none';
+                };
+                jumpZone.addEventListener('touchend', endJump);
+                jumpZone.addEventListener('touchcancel', endJump);
             }
         };
 
         const sfx = {
-            ctx: null, engineOsc: null, engineGain: null, filter: null, noiseBuffer: null, skidOsc: null, skidGain: null, 
-            bgm: null, bgmGain: null, isMusicOn: true,
-            
+            ctx: null, engineOsc: null, engineGain: null, filter: null, noiseBuffer: null, skidOsc: null, skidGain: null,
             init: function() {
-                if (this.ctx) {
-                    if (this.ctx.state === 'suspended') this.ctx.resume();
-                    return;
-                }
+                if (this.ctx) return;
                 const AC = window.AudioContext || window.webkitAudioContext;
                 this.ctx = new AC();
-                
-                // --- SFX Setup ---
                 const bufferSize = this.ctx.sampleRate * 2; 
                 this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
                 const data = this.noiseBuffer.getChannelData(0);
@@ -383,38 +411,7 @@
                 this.skidOsc.connect(this.skidGain);
                 this.skidGain.connect(this.ctx.destination);
                 this.skidOsc.start();
-
-                // --- Music Setup ---
-                this.bgm = new Audio('music/cybertruck.mp3');
-                this.bgm.loop = true;
-                this.bgm.volume = 0.6; // Slightly lower than max
-                
-                // Try playing if configured
-                if(this.isMusicOn) this.playMusic();
             },
-            
-            playMusic: function() {
-                if (this.bgm && this.isMusicOn && this.bgm.paused) {
-                    this.bgm.play().catch(e => console.log("Audio play failed, waiting for interaction"));
-                }
-            },
-
-            toggleMusic: function() {
-                this.isMusicOn = !this.isMusicOn;
-                if(this.bgm) {
-                    if(this.isMusicOn) this.bgm.play();
-                    else this.bgm.pause();
-                }
-                const btn = document.getElementById('music-indicator');
-                if(this.isMusicOn) {
-                    btn.innerText = "MUSIC: ON";
-                    btn.classList.add('active');
-                } else {
-                    btn.innerText = "MUSIC: OFF";
-                    btn.classList.remove('active');
-                }
-            },
-
             updateEngine: function(speedPercent, isSkidding) {
                 if (!this.ctx) return;
                 this.engineOsc.frequency.setTargetAtTime(60 + (speedPercent * 300), this.ctx.currentTime, 0.1);
@@ -483,16 +480,12 @@
             loadModels();
 
             window.addEventListener('resize', onWindowResize);
-            document.addEventListener('keydown', (e) => { onKey(e, true); sfx.init(); sfx.playMusic(); });
+            document.addEventListener('keydown', (e) => { onKey(e, true); sfx.init(); });
             document.addEventListener('keyup', (e) => onKey(e, false));
+            const camInd = document.getElementById('camera-indicator'); camInd.addEventListener('click', (e) => { e.stopPropagation(); switchCamera(); });
             
-            const camInd = document.getElementById('camera-indicator'); 
-            camInd.addEventListener('click', (e) => { e.stopPropagation(); switchCamera(); });
+            controls.init(); // Init new touch controls
             
-            const musInd = document.getElementById('music-indicator');
-            musInd.addEventListener('click', (e) => { e.stopPropagation(); sfx.toggleMusic(); });
-
-            setupTouchControls();
             animate();
         }
 
@@ -620,17 +613,6 @@
         function addExhaust() { const exhaustPoint = new THREE.Object3D(); exhaustPoint.position.set(0, 0.5, -1.2); exhaustPoint.name = "exhaust"; bikeGroup.add(exhaustPoint); }
         function checkLoading() { if (assetsLoaded >= assetsTotal) { setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 500); } }
         
-        function setupTouchControls() {
-            joystick.init();
-            const bindBtn = (id, key) => {
-                const btn = document.getElementById(id);
-                const start = (e) => { e.preventDefault(); keys[key] = true; btn.classList.add('active'); sfx.init(); sfx.playMusic(); if(window.navigator.vibrate) window.navigator.vibrate(10); };
-                const end = (e) => { e.preventDefault(); keys[key] = false; btn.classList.remove('active'); };
-                btn.addEventListener('touchstart', start, { passive: false }); btn.addEventListener('touchend', end, { passive: false });
-            };
-            bindBtn('btn-jump', 'space');
-        }
-
         function createTerrain() {
             const geometry = new THREE.PlaneGeometry(400, 400, 400, 400); geometry.rotateX(-Math.PI / 2); const positions = geometry.attributes.position.array;
             for (let i = 0; i < positions.length; i += 3) {
