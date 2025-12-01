@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Tesla Madness 1998 - Cybertruck Edition</title>
+    <title>Tesla Madness 1998 - Moto FBX</title>
     
     <script type="importmap">
     {
@@ -70,6 +70,58 @@
             border-radius: 4px;
         }
 
+        /* LOADING SCREEN STYLES */
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: clamp(280px, 60vw, 500px);
+            background: black;
+            padding: 20px;
+            border: 2px solid #ffcc00;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(255, 204, 0, 0.2);
+        }
+
+        .loading-title {
+            color: white;
+            font-size: clamp(16px, 4vw, 20px);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 20px;
+            background: #222;
+            border: 1px solid #555;
+            margin-bottom: 10px;
+            position: relative;
+        }
+
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background: #ffcc00;
+            transition: width 0.2s;
+        }
+
+        #loading-text {
+            color: #aaa;
+            font-size: 12px;
+        }
+        
+        .error-msg {
+            color: #ff3333 !important;
+        }
+
         .touch-controls {
             position: absolute;
             bottom: max(20px, env(safe-area-inset-bottom));
@@ -130,9 +182,18 @@
 </head>
 <body>
 
+    <!-- LOADING SCREEN -->
+    <div id="loading">
+        <div class="loading-title">LOADING ASSETS...</div>
+        <div class="progress-track">
+            <div id="progress-bar"></div>
+        </div>
+        <div id="loading-text">CONNECTING TO SERVER...</div>
+    </div>
+
     <div id="ui-layer">
         <h1>TESLA MADNESS '98</h1>
-        <p>VEHICLE: <span class="accent">CYBERTRUCK</span> | SFX: <span class="blink">READY</span></p>
+        <p>VEHICLE: <span class="accent">MOTO FBX</span> | PHYSICS: <span class="blink">ACTIVE</span></p>
         <p class="desktop-hint">KEYBOARD: WASD | SPACE</p>
         <p class="mobile-hint">TOUCH: Controls Active</p>
         <p style="color:#aaa; font-size:10px; margin-top:5px;">* TAP SCREEN TO START AUDIO *</p>
@@ -161,7 +222,7 @@
 
     <script type="module">
         import * as THREE from 'three';
-        import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+        import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 
         let scene, camera, renderer;
         let bikeGroup, terrainMesh;
@@ -173,7 +234,16 @@
         let lastTime = 0;
         let billboardTrees = [];
         let isAirborne = false;
+        let assetsLoaded = 0;
+        let assetsTotal = 2; // Moto + Tree
         
+        // Physics / Collision Arrays
+        let obstacles = []; // Stores {x, z, radius}
+        
+        // Loading Progress Variables
+        let progressMoto = 0;
+        let progressTree = 0;
+
         const MAX_SPEED = 1.2;
         const ACCEL = 0.02;
         const FRICTION = 0.98;
@@ -185,7 +255,6 @@
         const keys = { w: false, a: false, s: false, d: false, space: false };
         let activeCameraMode = 1; 
 
-        // --- AUDIO ENGINE ---
         const sfx = {
             ctx: null, engineOsc: null, engineGain: null, filter: null, noiseBuffer: null,
             init: function() {
@@ -213,15 +282,9 @@
             },
             updateEngine: function(speedPercent) {
                 if (!this.ctx) return;
-                // Electric hum sound profile
-                const pitch = 80 + (speedPercent * 400); 
-                this.engineOsc.frequency.setTargetAtTime(pitch, this.ctx.currentTime, 0.1);
-                
-                const vol = 0.05 + (speedPercent * 0.15); 
-                this.engineGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.1);
-
-                const cutoff = 300 + (speedPercent * 2000);
-                this.filter.frequency.setTargetAtTime(cutoff, this.ctx.currentTime, 0.1);
+                this.engineOsc.frequency.setTargetAtTime(60 + (speedPercent * 300), this.ctx.currentTime, 0.1);
+                this.engineGain.gain.setTargetAtTime(0.05 + (speedPercent * 0.1), this.ctx.currentTime, 0.1);
+                this.filter.frequency.setTargetAtTime(200 + (speedPercent * 3000), this.ctx.currentTime, 0.1);
             },
             playLand: function(intensity) {
                 if (!this.ctx) return;
@@ -263,23 +326,19 @@
             renderer.toneMappingExposure = 1.1;
             container.appendChild(renderer.domElement);
 
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
             scene.add(ambientLight);
 
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
             dirLight.position.set(50, 100, 50);
             dirLight.castShadow = true;
-            dirLight.shadow.mapSize.width = 2048; 
-            dirLight.shadow.mapSize.height = 2048;
+            dirLight.shadow.mapSize.width = 4096; 
+            dirLight.shadow.mapSize.height = 4096;
             dirLight.shadow.bias = -0.0001;
             scene.add(dirLight);
 
             createTerrain();
-            createCybertruck();
-            createEnhancedTrees();
-            createBillboardTrees();
-            createRocks();
-            createFences();
+            loadModels();
 
             window.addEventListener('resize', onWindowResize);
             document.addEventListener('keydown', (e) => { onKey(e, true); sfx.init(); });
@@ -295,173 +354,157 @@
             animate();
         }
 
-        function createCybertruck() {
-            bikeGroup = new THREE.Group();
-            
-            // Materials
-            const metalMat = new THREE.MeshStandardMaterial({ 
-                color: 0xcccccc, 
-                roughness: 0.2, 
-                metalness: 0.9 
-            });
-            const glassMat = new THREE.MeshStandardMaterial({ 
-                color: 0x111111, 
-                roughness: 0.1, 
-                metalness: 0.5 
-            });
-            const tireMat = new THREE.MeshStandardMaterial({ 
-                color: 0x111111, 
-                roughness: 0.9 
-            });
-            const lightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-            const tailMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-
-            // 1. Chassis Body (Extruded Shape for Profile)
-            const length = 1.8;
-            const width = 0.8;
-            const shape = new THREE.Shape();
-            
-            // Draw profile from side view
-            shape.moveTo(-0.9, 0); // Bottom rear
-            shape.lineTo(0.9, 0);  // Bottom front
-            shape.lineTo(0.9, 0.4); // Front bumper top
-            shape.lineTo(0.4, 0.45); // Hood start
-            shape.lineTo(0.0, 0.9);  // Roof Peak
-            shape.lineTo(-0.9, 0.6); // Bed top
-            shape.lineTo(-0.9, 0);   // Close
-
-            const extrudeSettings = {
-                steps: 1,
-                depth: width,
-                bevelEnabled: true,
-                bevelThickness: 0.02,
-                bevelSize: 0.02,
-                bevelSegments: 1
-            };
-
-            const chassisGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-            chassisGeo.center(); // Center the geometry
-            const chassis = new THREE.Mesh(chassisGeo, metalMat);
-            chassis.position.y = 0.6;
-            chassis.castShadow = true;
-            chassis.receiveShadow = true;
-            bikeGroup.add(chassis);
-
-            // 2. Windows (Simple Planes slightly offset)
-            const winGeo = new THREE.PlaneGeometry(0.7, 0.3);
-            const winL = new THREE.Mesh(winGeo, glassMat);
-            winL.position.set(0.1, 0.85, 0.41);
-            winL.rotation.y = 0; // Side
-            // Actually simpler to just use black boxes clipping in
-            const glassBlock = new THREE.BoxGeometry(1.2, 0.3, 0.82);
-            const glass = new THREE.Mesh(glassBlock, glassMat);
-            glass.position.set(0, 0.75, 0);
-            // This is a hack, but works for low poly "tinted windows" look
-            // bikeGroup.add(glass); 
-
-            // 3. Wheels (Chunky Cylinders)
-            const wheelGeo = new THREE.CylinderGeometry(0.25, 0.25, 0.3, 16);
-            wheelGeo.rotateZ(Math.PI / 2);
-            
-            const wheelPos = [
-                { x: 0.6, z: 0.35 }, { x: 0.6, z: -0.35 },
-                { x: -0.6, z: 0.35 }, { x: -0.6, z: -0.35 }
-            ];
-
-            wheelPos.forEach(pos => {
-                const w = new THREE.Mesh(wheelGeo, tireMat);
-                w.position.set(pos.x, 0.25, pos.z);
-                w.castShadow = true;
-                bikeGroup.add(w);
-                
-                // Hubcap
-                const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.32, 6), metalMat);
-                cap.rotation.z = Math.PI/2;
-                cap.position.copy(w.position);
-                bikeGroup.add(cap);
-            });
-
-            // 4. Lights (Lightbar)
-            const headLightGeo = new THREE.BoxGeometry(0.05, 0.05, 0.8);
-            const headLight = new THREE.Mesh(headLightGeo, lightMat);
-            headLight.position.set(0.88, 0.65, 0);
-            bikeGroup.add(headLight);
-
-            const tailLightGeo = new THREE.BoxGeometry(0.05, 0.05, 0.8);
-            const tailLight = new THREE.Mesh(tailLightGeo, tailMat);
-            tailLight.position.set(-0.88, 0.65, 0);
-            bikeGroup.add(tailLight);
-
-            // Exhaust (Particle emitter point)
-            const exhaustPoint = new THREE.Object3D();
-            exhaustPoint.position.set(-0.9, 0.2, 0);
-            exhaustPoint.name = "exhaust";
-            bikeGroup.add(exhaustPoint);
-
-            scene.add(bikeGroup);
+        function updateProgress() {
+            const total = Math.round((progressMoto + progressTree) / 2);
+            const bar = document.getElementById('progress-bar');
+            const text = document.getElementById('loading-text');
+            if(bar) bar.style.width = total + "%";
+            if(text && text.className !== 'error-msg') text.innerText = "DOWNLOADING... " + total + "%";
         }
 
-        function createEnhancedTrees() {
-            // Create a merged geometry for a single tree
-            // Trunk
-            const trunkGeo = new THREE.CylinderGeometry(0.2, 0.4, 1.5, 6);
-            trunkGeo.translate(0, 0.75, 0);
-            
-            // Foliage Layers (Stacked Cones)
-            const layer1 = new THREE.ConeGeometry(1.2, 1.5, 6);
-            layer1.translate(0, 2.0, 0);
-            
-            const layer2 = new THREE.ConeGeometry(0.9, 1.2, 6);
-            layer2.translate(0, 2.8, 0);
-            
-            const layer3 = new THREE.ConeGeometry(0.6, 1.0, 6);
-            layer3.translate(0, 3.5, 0);
+        function reportError(name) {
+             const text = document.getElementById('loading-text');
+             if(text) {
+                 text.innerText = "ERROR: " + name + " NOT FOUND. USING FALLBACK.";
+                 text.className = "error-msg";
+             }
+        }
 
-            // Merge geometries? 
-            // For InstancedMesh with multi-materials, it's tricky. 
-            // Easier: 2 InstancedMeshes. One for trunks, one for leaves.
+        function loadModels() {
+            const loader = new FBXLoader();
             
-            const count = 80;
-            const dummy = new THREE.Object3D();
-            const transforms = []; // Store matrices
+            // 1. BIKE SETUP
+            bikeGroup = new THREE.Group();
+            scene.add(bikeGroup); 
 
-            // Calculate positions
-            for(let i=0; i<count; i++) {
-                const x = (Math.random() - 0.5) * 300;
-                const z = (Math.random() - 0.5) * 300;
-                if(Math.abs(x) < 20 && Math.abs(z) < 20) { i--; continue; }
+            // Load fbx/moto.fbx
+            loader.load('fbx/moto.fbx', (object) => {
+                // SCALING: 50% smaller (0.005)
+                object.scale.set(0.005, 0.005, 0.005);
                 
-                const y = getTerrainHeight(x, z);
-                const s = 1.0 + Math.random() * 0.5;
+                // ROTATION: Back faces camera. Usually models face +Z or -Z.
+                // 180 degree rotation usually does the trick if it was facing wrong way.
+                object.rotation.y = Math.PI; 
+
+                object.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                });
+                bikeGroup.add(object);
+                addExhaust();
+                assetsLoaded++;
+                checkLoading();
+            }, (xhr) => {
+                if (xhr.lengthComputable) {
+                    progressMoto = (xhr.loaded / xhr.total) * 100;
+                    updateProgress();
+                } else {
+                     progressMoto = 50; updateProgress();
+                }
+            }, (error) => {
+                console.warn("Moto FBX missing. Using Box fallback.");
+                reportError("moto.fbx");
+                createFallbackBike();
+                assetsLoaded++;
+                checkLoading();
+            });
+
+            // 2. TREE SETUP
+            loader.load('fbx/Tree.fbx', (object) => {
+                const count = 60; 
+                const dummy = new THREE.Object3D();
+                const transforms = [];
                 
-                dummy.position.set(x, y, z);
-                dummy.scale.set(s, s, s);
-                dummy.rotation.y = Math.random() * Math.PI;
-                dummy.updateMatrix();
-                transforms.push(dummy.matrix.clone());
+                // Generate positions and store for collision
+                for(let i=0; i<count; i++) {
+                    const x = (Math.random() - 0.5) * 200;
+                    const z = (Math.random() - 0.5) * 200;
+                    if (Math.abs(x) < 20 && Math.abs(z) < 20) { i--; continue; } 
+                    
+                    const y = getTerrainHeight(x, z);
+                    const s = 0.015 * (0.8 + Math.random() * 0.5); 
+                    
+                    dummy.position.set(x, y, z);
+                    dummy.rotation.set(0, Math.random() * Math.PI * 2, 0); 
+                    dummy.scale.set(s, s, s);
+                    dummy.updateMatrix();
+                    transforms.push(dummy.matrix.clone());
+
+                    // ADD COLLISION OBSTACLE
+                    obstacles.push({ x: x, z: z, radius: 1.5 }); // Tree collision radius
+                }
+
+                object.traverse((child) => {
+                    if (child.isMesh) {
+                        const instancedMesh = new THREE.InstancedMesh(child.geometry, child.material, count);
+                        instancedMesh.castShadow = true;
+                        instancedMesh.receiveShadow = true;
+                        for(let i=0; i<count; i++) instancedMesh.setMatrixAt(i, transforms[i]);
+                        instancedMesh.instanceMatrix.needsUpdate = true;
+                        scene.add(instancedMesh);
+                    }
+                });
+                assetsLoaded++;
+                checkLoading();
+            }, (xhr) => {
+                if (xhr.lengthComputable) {
+                    progressTree = (xhr.loaded / xhr.total) * 100;
+                    updateProgress();
+                } else {
+                     progressTree = 50; updateProgress();
+                }
+            }, (err) => {
+                console.warn("Tree FBX missing. Using Cone fallback.");
+                reportError("Tree.fbx");
+                createFallbackTrees();
+                assetsLoaded++;
+                checkLoading();
+            });
+
+            createBillboardTrees();
+            createRocks();
+            createFences();
+        }
+
+        function createFallbackBike() {
+            const geo = new THREE.BoxGeometry(0.5, 0.5, 1);
+            const mat = new THREE.MeshStandardMaterial({color: 0xff0000});
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.y = 0.5;
+            bikeGroup.add(mesh);
+            addExhaust();
+        }
+
+        function createFallbackTrees() {
+            const geo = new THREE.ConeGeometry(1, 4, 8);
+            const mat = new THREE.MeshStandardMaterial({color: 0x00ff00});
+            for(let i=0; i<30; i++) {
+                 const x = (Math.random() - 0.5) * 200;
+                 const z = (Math.random() - 0.5) * 200;
+                 const y = getTerrainHeight(x, z);
+                 const mesh = new THREE.Mesh(geo, mat);
+                 mesh.position.set(x, y+2, z);
+                 scene.add(mesh);
+                 // Add collision for fallbacks too
+                 obstacles.push({ x: x, z: z, radius: 1.5 });
             }
+        }
 
-            // 1. Trunks InstancedMesh
-            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 1.0 });
-            const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
-            trunkMesh.castShadow = true;
-            trunkMesh.receiveShadow = true;
-            
-            // 2. Foliage InstancedMesh (Merge cones first for single draw call per tree part)
-            const foliageGeo = BufferGeometryUtils.mergeGeometries([layer1, layer2, layer3]);
-            const foliageMat = new THREE.MeshStandardMaterial({ color: 0x2d5a27, roughness: 0.8 });
-            const foliageMesh = new THREE.InstancedMesh(foliageGeo, foliageMat, count);
-            foliageMesh.castShadow = true;
-            foliageMesh.receiveShadow = true;
+        function addExhaust() {
+            const exhaustPoint = new THREE.Object3D(); 
+            exhaustPoint.position.set(0, 0.5, -1.2); 
+            exhaustPoint.name = "exhaust"; 
+            bikeGroup.add(exhaustPoint);
+        }
 
-            // Apply matrices
-            for(let i=0; i<count; i++) {
-                trunkMesh.setMatrixAt(i, transforms[i]);
-                foliageMesh.setMatrixAt(i, transforms[i]);
+        function checkLoading() {
+            if (assetsLoaded >= assetsTotal) {
+                setTimeout(() => {
+                    document.getElementById('loading').style.display = 'none';
+                }, 500);
             }
-
-            scene.add(trunkMesh);
-            scene.add(foliageMesh);
         }
 
         function setupTouchControls() {
@@ -483,38 +526,45 @@
         }
 
         function createTerrain() {
-            const geometry = new THREE.PlaneGeometry(400, 400, 150, 150);
+            const geometry = new THREE.PlaneGeometry(400, 400, 200, 200);
             geometry.rotateX(-Math.PI / 2);
             const positions = geometry.attributes.position.array;
             
             for (let i = 0; i < positions.length; i += 3) {
                 const x = positions[i];
                 const z = positions[i + 2];
-                // Smoother rolling hills
-                const y = (Math.sin(x * 0.03) * 5) + (Math.cos(z * 0.03) * 5) + (Math.sin(x * 0.1 + z * 0.1) * 2);
-                
-                // Edge containment bowl
+                const y = (Math.sin(x * 0.05) * 4) + (Math.cos(z * 0.05) * 4) + (Math.sin(x * 0.2 + z * 0.1) * 1.5) + (Math.random() * 0.3);
                 const dist = Math.sqrt(x*x + z*z);
                 let bowl = 0;
-                if(dist > 100) bowl = (dist - 100) * 0.15;
-                
+                if(dist > 50) bowl = (dist - 50) * 0.15;
                 positions[i + 1] = y + bowl;
             }
             geometry.computeVertexNormals();
 
-            // Simple Vertex Colors or Texture
-            const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 512;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#C2B280'; ctx.fillRect(0,0,512,512); // Sand
-            // Noise
-            for(let i=0; i<10000; i++) {
-                ctx.fillStyle = Math.random() > 0.5 ? '#dcb183' : '#a08060';
-                ctx.fillRect(Math.random()*512, Math.random()*512, 2, 2);
-            }
-            const tex = new THREE.CanvasTexture(canvas);
-            tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(20, 20);
+            const canvasDiffuse = document.createElement('canvas'); canvasDiffuse.width = 1024; canvasDiffuse.height = 1024;
+            const ctxD = canvasDiffuse.getContext('2d');
+            const canvasRough = document.createElement('canvas'); canvasRough.width = 1024; canvasRough.height = 1024;
+            const ctxR = canvasRough.getContext('2d');
 
-            const material = new THREE.MeshStandardMaterial({ map: tex, roughness: 1.0 });
+            ctxD.fillStyle = '#C2B280'; ctxD.fillRect(0,0,1024,1024);
+            ctxR.fillStyle = '#FF0000'; ctxR.fillRect(0,0,1024,1024); 
+
+            for(let i=0; i<40; i++) {
+                const cx = Math.random() * 1024; const cy = Math.random() * 1024; const rad = 50 + Math.random() * 100;
+                const gradD = ctxD.createRadialGradient(cx, cy, 0, cx, cy, rad);
+                gradD.addColorStop(0, '#5C4033'); gradD.addColorStop(1, 'rgba(92, 64, 51, 0)');
+                ctxD.fillStyle = gradD; ctxD.beginPath(); ctxD.arc(cx, cy, rad, 0, Math.PI*2); ctxD.fill();
+                const gradR = ctxR.createRadialGradient(cx, cy, 0, cx, cy, rad);
+                gradR.addColorStop(0, '#333333'); gradR.addColorStop(1, '#FFFFFF');
+                ctxR.fillStyle = gradR; ctxR.beginPath(); ctxR.arc(cx, cy, rad, 0, Math.PI*2); ctxR.fill();
+            }
+
+            const texDiffuse = new THREE.CanvasTexture(canvasDiffuse);
+            texDiffuse.wrapS = THREE.RepeatWrapping; texDiffuse.wrapT = THREE.RepeatWrapping; texDiffuse.repeat.set(20, 20);
+            const texRough = new THREE.CanvasTexture(canvasRough);
+            texRough.wrapS = THREE.RepeatWrapping; texRough.wrapT = THREE.RepeatWrapping; texRough.repeat.set(20, 20);
+
+            const material = new THREE.MeshStandardMaterial({ map: texDiffuse, roughnessMap: texRough, roughness: 1.0, metalness: 0.0, side: THREE.DoubleSide });
             terrainMesh = new THREE.Mesh(geometry, material);
             terrainMesh.receiveShadow = true;
             scene.add(terrainMesh);
@@ -528,21 +578,24 @@
         }
 
         function createBillboardTrees() {
-            // Distant trees
             const billboardGeo = new THREE.PlaneGeometry(8, 12);
             const billboardMat = new THREE.MeshBasicMaterial({ color: 0x1a5c1a, side: THREE.DoubleSide, transparent:true, opacity:0.8 });
             for(let i=0; i<50; i++) {
-                const angle = Math.random() * Math.PI * 2; const rad = 150 + Math.random() * 50;
+                const angle = Math.random() * Math.PI * 2; const rad = 120 + Math.random() * 80;
                 const x = Math.cos(angle) * rad; const z = Math.sin(angle) * rad; const y = getTerrainHeight(x, z) + 6;
                 const bb = new THREE.Mesh(billboardGeo, billboardMat); bb.position.set(x,y,z); scene.add(bb); billboardTrees.push(bb);
+                // No collision for far away billboards
             }
         }
 
         function createRocks() {
              const rockGeo = new THREE.DodecahedronGeometry(1, 0); const rockMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.9 });
-            for(let i=0; i< 30; i++) {
-                const x = (Math.random() - 0.5) * 350; const z = (Math.random() - 0.5) * 350; const y = getTerrainHeight(x, z);
+            for(let i=0; i< 25; i++) {
+                const x = (Math.random() - 0.5) * 300; const z = (Math.random() - 0.5) * 300; const y = getTerrainHeight(x, z);
                 const rock = new THREE.Mesh(rockGeo, rockMat); rock.position.set(x, y + 0.5, z); rock.scale.set(1 + Math.random(), 1 + Math.random(), 1 + Math.random()); rock.rotation.set(Math.random(), Math.random(), Math.random()); rock.castShadow = true; scene.add(rock);
+                
+                // Add collision for Rocks
+                obstacles.push({ x: x, z: z, radius: 1.0 });
             }
         }
 
@@ -596,6 +649,23 @@
             camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
+        // --- PHYSICS CHECK ---
+        function checkCollisions(newX, newZ) {
+            // Bike Radius approx 0.5
+            const bikeRadius = 0.5;
+            
+            for(let obs of obstacles) {
+                const dx = newX - obs.x;
+                const dz = newZ - obs.z;
+                const dist = Math.sqrt(dx*dx + dz*dz);
+                
+                if (dist < (bikeRadius + obs.radius)) {
+                    return true; // Collision detected
+                }
+            }
+            return false;
+        }
+
         function animate(time) {
             requestAnimationFrame(animate);
 
@@ -612,9 +682,23 @@
             }
 
             if (bikeGroup) {
-                velocity.set(0, 0, speed);
-                velocity.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                bikeGroup.position.add(velocity);
+                // Calculate NEXT position
+                const nextVel = new THREE.Vector3(0, 0, speed);
+                nextVel.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
+                const nextX = bikeGroup.position.x + nextVel.x;
+                const nextZ = bikeGroup.position.z + nextVel.z;
+
+                // CHECK COLLISION BEFORE MOVING
+                if (checkCollisions(nextX, nextZ)) {
+                    // STOP and BOUNCE
+                    speed = -speed * 0.5;
+                    sfx.playLand(1.0); // reused sound for impact
+                } else {
+                    // SAFE TO MOVE
+                    velocity.set(0, 0, speed);
+                    velocity.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
+                    bikeGroup.position.add(velocity);
+                }
 
                 if (bikeGroup.position.x > MAP_LIMIT) { bikeGroup.position.x = MAP_LIMIT; speed = 0; }
                 if (bikeGroup.position.x < -MAP_LIMIT) { bikeGroup.position.x = -MAP_LIMIT; speed = 0; }
@@ -637,9 +721,9 @@
                 }
 
                 const aheadV = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                const nextX = bikeGroup.position.x + aheadV.x;
-                const nextZ = bikeGroup.position.z + aheadV.z;
-                const nextH = getTerrainHeight(nextX, nextZ);
+                const nextXPos = bikeGroup.position.x + aheadV.x;
+                const nextZPos = bikeGroup.position.z + aheadV.z;
+                const nextH = getTerrainHeight(nextXPos, nextZPos);
                 const angle = Math.atan2(nextH - groundH, 1.0);
                 bikeGroup.rotation.x = THREE.MathUtils.lerp(bikeGroup.rotation.x, -angle, 0.1);
                 
