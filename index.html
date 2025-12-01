@@ -188,7 +188,7 @@
         <div class="progress-track">
             <div id="progress-bar"></div>
         </div>
-        <div id="loading-text">SEARCHING FOR /fbx/ FILES...</div>
+        <div id="loading-text">SEARCHING FOR fbx/ FILES...</div>
     </div>
 
     <div id="ui-layer">
@@ -376,8 +376,8 @@
             bikeGroup = new THREE.Group();
             scene.add(bikeGroup); 
 
-            // ATTEMPT LOAD MOTO
-            loader.load('/fbx/moto.fbx', (object) => {
+            // PATH FIX: use 'fbx/moto.fbx' not '/fbx/moto.fbx'
+            loader.load('fbx/moto.fbx', (object) => {
                 // SUCCESS
                 object.scale.set(0.01, 0.01, 0.01);
                 object.rotation.y = Math.PI;
@@ -392,17 +392,15 @@
                 assetsLoaded++;
                 checkLoading();
             }, (xhr) => {
-                // PROGRESS
                 if (xhr.lengthComputable) {
                     progressMoto = (xhr.loaded / xhr.total) * 100;
                     updateProgress();
                 } else {
-                    // Fake progress if no headers
                      progressMoto = 50; 
                      updateProgress();
                 }
             }, (error) => {
-                // ERROR - FALLBACK
+                // ERROR
                 console.warn("Moto FBX missing. Using Box fallback.");
                 reportError("moto.fbx");
                 createFallbackBike();
@@ -411,7 +409,8 @@
             });
 
             // 2. TREE SETUP
-            loader.load('/fbx/Tree.fbx', (object) => {
+            // PATH FIX: use 'fbx/Tree.fbx' (Case Sensitive & No leading slash)
+            loader.load('fbx/Tree.fbx', (object) => {
                 // SUCCESS
                 const count = 60; 
                 const dummy = new THREE.Object3D();
@@ -442,7 +441,6 @@
                 assetsLoaded++;
                 checkLoading();
             }, (xhr) => {
-                // PROGRESS
                 if (xhr.lengthComputable) {
                     progressTree = (xhr.loaded / xhr.total) * 100;
                     updateProgress();
@@ -451,7 +449,7 @@
                      updateProgress();
                 }
             }, (err) => {
-                // ERROR - FALLBACK
+                // ERROR
                 console.warn("Tree FBX missing. Using Cone fallback.");
                 reportError("Tree.fbx");
                 createFallbackTrees();
