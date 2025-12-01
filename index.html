@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Tesla Madness 1998 - Mobile Controls</title>
+    <title>Tesla Madness 1998 - Battery Update</title>
     
     <script type="importmap">
     {
@@ -34,6 +34,7 @@
             text-shadow: 2px 2px 0px #000;
             pointer-events: none;
             z-index: 10;
+            width: 300px;
         }
         
         h1 { margin: 0; font-size: clamp(16px, 4vw, 24px); letter-spacing: 2px; text-transform: uppercase; font-weight: bold; }
@@ -41,6 +42,28 @@
         .accent { color: #00ff00; }
         .blink { animation: blinker 1.5s linear infinite; color: #ff00ff; }
         @keyframes blinker { 50% { opacity: 0; } }
+
+        /* BATTERY BAR */
+        .battery-container {
+            margin-top: 10px;
+            width: 100%;
+            height: 15px;
+            background: rgba(0,0,0,0.5);
+            border: 2px solid #fff;
+            position: relative;
+        }
+        #battery-bar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00);
+            transition: width 0.2s;
+        }
+        #battery-text {
+            position: absolute;
+            top: -20px; right: 0;
+            font-size: 12px;
+            color: #fff;
+        }
         
         .hud-stats {
             position: absolute;
@@ -70,7 +93,6 @@
             border-radius: 4px;
         }
 
-        /* LOADING SCREEN */
         #loading {
             position: absolute;
             top: 50%;
@@ -94,63 +116,29 @@
         #loading-text { color: #aaa; font-size: 12px; }
         .error-msg { color: #ff3333 !important; }
 
-        /* --- MOBILE CONTROLS --- */
-        #mobile-controls {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none;
-            z-index: 50;
-            /* Hidden on desktop by default, shown via JS if touch detected or forced */
-            display: none; 
-        }
-
-        /* Show controls on touch devices */
-        @media (pointer: coarse) {
-            #mobile-controls { display: block; }
-        }
-
-        /* LEFT ZONE: JOYSTICK */
-        #joystick-zone {
-            position: absolute;
-            bottom: 0; left: 0;
-            width: 50%; height: 60%;
-            pointer-events: auto;
-            touch-action: none;
-        }
-
-        /* The Joystick UI (Created dynamically but styled here) */
-        .joystick-base {
-            position: absolute;
-            width: 120px; height: 120px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid rgba(255, 204, 0, 0.3);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            display: none; /* Hidden until touch */
-            pointer-events: none;
-        }
-        .joystick-knob {
-            position: absolute;
-            width: 50px; height: 50px;
-            background: rgba(255, 204, 0, 0.8);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            left: 50%; top: 50%;
-            box-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
-        }
-
-        /* RIGHT ZONE: ACTIONS */
-        #action-zone {
+        .touch-controls {
             position: absolute;
             bottom: max(20px, env(safe-area-inset-bottom));
-            right: max(20px, env(safe-area-inset-right));
-            width: 40%; height: 40%;
+            left: 0;
+            width: 100%;
+            height: auto;
             pointer-events: none;
+            z-index: 50;
             display: flex;
-            flex-direction: row-reverse;
+            justify-content: space-between;
+            padding-left: max(20px, env(safe-area-inset-left));
+            padding-right: max(20px, env(safe-area-inset-right));
+            box-sizing: border-box;
             align-items: flex-end;
-            gap: 15px;
         }
+
+        #joystick-zone { width: 40%; height: 200px; pointer-events: auto; touch-action: none; position: relative; }
+        .joystick-base { position: absolute; width: 100px; height: 100px; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 204, 0, 0.3); border-radius: 50%; transform: translate(-50%, -50%); display: none; pointer-events: none; }
+        .joystick-knob { position: absolute; width: 40px; height: 40px; background: rgba(255, 204, 0, 0.8); border-radius: 50%; transform: translate(-50%, -50%); left: 50%; top: 50%; }
+        .joystick-hint { position: absolute; bottom: 20px; left: 0; color: rgba(255,255,255,0.3); font-size: 12px; pointer-events: none; }
+
+        #pedal-zone { width: 50%; pointer-events: none; display: flex; flex-direction: row; justify-content: flex-end; align-items: flex-end; gap: 15px; }
+        .brake-jump-col { display: flex; flex-direction: column; gap: 15px; align-items: center; justify-content: flex-end; pointer-events: none; }
 
         .control-btn {
             pointer-events: auto;
@@ -167,70 +155,33 @@
             touch-action: manipulation;
             transition: transform 0.1s, background 0.1s;
         }
-        .control-btn:active, .control-btn.active {
-            background: rgba(255, 204, 0, 0.6);
-            border-color: #ffcc00;
-            transform: scale(0.95);
-            color: black;
-        }
+        .control-btn:active, .control-btn.active { transform: scale(0.95); color: black; }
 
-        /* PEDAL SHAPES */
-        #btn-gas {
-            width: clamp(70px, 15vw, 90px);
-            height: clamp(120px, 25vw, 160px);
-            border-radius: 20px 20px 10px 10px;
-            font-size: 14px;
-            writing-mode: vertical-rl;
-            text-orientation: upright;
-        }
-        
-        #btn-brake {
-            width: clamp(80px, 18vw, 100px);
-            height: clamp(60px, 12vw, 80px);
-            border-radius: 10px;
-            margin-bottom: 0;
-            align-self: flex-end;
-            font-size: 14px;
-        }
-
-        #btn-jump {
-            position: absolute;
-            top: -20px;
-            right: 120px;
-            width: clamp(70px, 15vw, 90px);
-            height: clamp(70px, 15vw, 90px);
-            border-radius: 50%;
-            border-color: #ffcc00;
-            background: rgba(255, 50, 50, 0.2);
-            font-size: 12px;
-        }
-
-        /* Hint Text for Joystick */
-        .joystick-hint {
-            position: absolute;
-            bottom: 20px; left: 20px;
-            color: rgba(255,255,255,0.3);
-            font-size: 12px;
-            pointer-events: none;
-        }
+        #btn-gas { width: clamp(70px, 15vw, 90px); height: clamp(140px, 28vw, 180px); border-radius: 20px 20px 10px 10px; font-size: 14px; writing-mode: vertical-rl; text-orientation: upright; background: rgba(0, 255, 0, 0.2); border-color: #00ff00; }
+        #btn-gas:active { background: rgba(0, 255, 0, 0.6); }
+        #btn-brake { width: clamp(80px, 18vw, 100px); height: clamp(60px, 12vw, 80px); border-radius: 12px; font-size: 14px; background: rgba(255, 255, 255, 0.15); }
+        #btn-brake:active { background: rgba(255, 255, 255, 0.6); }
+        #btn-jump { width: clamp(80px, 18vw, 100px); height: clamp(60px, 12vw, 80px); border-radius: 12px; font-size: 14px; background: rgba(255, 50, 50, 0.3); border-color: #ff3333; }
+        #btn-jump:active { background: rgba(255, 50, 50, 0.7); }
     </style>
 </head>
 <body>
 
-    <!-- LOADING SCREEN -->
     <div id="loading">
-        <div class="loading-title">INITIALIZING SYSTEM...</div>
+        <div class="loading-title">CHARGING BATTERIES...</div>
         <div class="progress-track">
             <div id="progress-bar"></div>
         </div>
-        <div id="loading-text">SEARCHING FOR ASSETS...</div>
+        <div id="loading-text">LOADING ASSETS...</div>
     </div>
 
-    <!-- UI LAYER -->
     <div id="ui-layer">
         <h1>TESLA MADNESS '98</h1>
-        <p>VEHICLE: <span class="accent">MOTO FBX</span> | PHYSICS: <span class="blink">ACTIVE</span></p>
-        <p class="desktop-hint">KEYBOARD: WASD | SPACE</p>
+        <div class="battery-container">
+            <div id="battery-bar"></div>
+            <div id="battery-text">BATTERY: 100%</div>
+        </div>
+        <p>COLLECT <span style="color:gold">GOLD RINGS</span> TO CHARGE</p>
     </div>
 
     <div id="camera-indicator">CAM: 3RD PERSON</div>
@@ -240,21 +191,20 @@
         <div id="fps">60 FPS</div>
     </div>
 
-    <!-- MOBILE CONTROLS OVERLAY -->
-    <div id="mobile-controls">
-        <!-- Left: Virtual Joystick -->
+    <!-- CONTROLS -->
+    <div class="touch-controls">
         <div id="joystick-zone">
             <div class="joystick-hint">DRAG TO STEER</div>
             <div class="joystick-base" id="joy-base">
                 <div class="joystick-knob" id="joy-knob"></div>
             </div>
         </div>
-
-        <!-- Right: Action Pedals -->
-        <div id="action-zone">
+        <div id="pedal-zone">
+            <div class="brake-jump-col">
+                <div class="control-btn" id="btn-jump">JUMP</div>
+                <div class="control-btn" id="btn-brake">BRAKE</div>
+            </div>
             <div class="control-btn" id="btn-gas">GAS</div>
-            <div class="control-btn" id="btn-brake">BRAKE</div>
-            <div class="control-btn" id="btn-jump">JUMP</div>
         </div>
     </div>
 
@@ -263,6 +213,7 @@
     <script type="module">
         import * as THREE from 'three';
         import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+        import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
         let scene, camera, renderer;
         let bikeGroup, terrainMesh;
@@ -270,17 +221,22 @@
         let velocity = new THREE.Vector3();
         let verticalVelocity = 0; 
         let particles = [];
+        let rings = []; // Store ring meshes
         let frameCount = 0;
         let lastTime = 0;
         let billboardTrees = [];
         let isAirborne = false;
         let assetsLoaded = 0;
-        let assetsTotal = 2; // Moto + Tree
+        let assetsTotal = 2; 
         let obstacles = [];
         
-        // Progress
         let progressMoto = 0;
         let progressTree = 0;
+
+        // GAMEPLAY STATS
+        let battery = 100;
+        const BATTERY_DRAIN = 0.05; // per frame while moving
+        const RING_CHARGE = 20;
 
         const MAX_SPEED = 1.2;
         const ACCEL = 0.02;
@@ -290,104 +246,34 @@
         const JUMP_FORCE = 0.8; 
         const MAP_LIMIT = 195; 
         
-        // Input State
         const keys = { w: false, a: false, s: false, d: false, space: false };
         let activeCameraMode = 1; 
-        let analogSteering = 0; // -1 (left) to 1 (right)
+        let analogSteering = 0;
 
-        // --- JOYSTICK LOGIC ---
+        // --- JOYSTICK ---
         const joystick = {
-            active: false,
-            origin: { x: 0, y: 0 },
-            current: { x: 0, y: 0 },
-            maxDist: 50,
-            
+            active: false, origin: { x: 0, y: 0 }, current: { x: 0, y: 0 }, maxDist: 50,
             init: function() {
                 const zone = document.getElementById('joystick-zone');
                 const base = document.getElementById('joy-base');
                 const knob = document.getElementById('joy-knob');
-
                 zone.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    const touch = e.changedTouches[0];
-                    this.active = true;
-                    this.origin.x = touch.clientX;
-                    this.origin.y = touch.clientY;
-                    
-                    // Show Joystick at touch point
-                    base.style.display = 'block';
-                    base.style.left = this.origin.x + 'px';
-                    base.style.top = this.origin.y + 'px';
-                    knob.style.transform = `translate(-50%, -50%)`;
-                    
-                    sfx.init(); // Unlock Audio
+                    e.preventDefault(); const touch = e.changedTouches[0]; this.active = true;
+                    const rect = zone.getBoundingClientRect(); this.origin.x = touch.clientX - rect.left; this.origin.y = touch.clientY - rect.top;
+                    base.style.display = 'block'; base.style.left = this.origin.x + 'px'; base.style.top = this.origin.y + 'px'; knob.style.transform = `translate(-50%, -50%)`; sfx.init();
                 }, { passive: false });
-
                 zone.addEventListener('touchmove', (e) => {
-                    if (!this.active) return;
-                    e.preventDefault();
-                    const touch = e.changedTouches[0];
-                    
-                    let dx = touch.clientX - this.origin.x;
-                    let dy = touch.clientY - this.origin.y;
-                    
-                    // Clamp distance
+                    if (!this.active) return; e.preventDefault(); const touch = e.changedTouches[0]; const rect = zone.getBoundingClientRect();
+                    let dx = (touch.clientX - rect.left) - this.origin.x; let dy = (touch.clientY - rect.top) - this.origin.y;
                     const dist = Math.sqrt(dx*dx + dy*dy);
-                    if (dist > this.maxDist) {
-                        const angle = Math.atan2(dy, dx);
-                        dx = Math.cos(angle) * this.maxDist;
-                        dy = Math.sin(angle) * this.maxDist;
-                    }
-
-                    // Move knob
-                    knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-                    
-                    // Update Steering (-1 to 1)
-                    analogSteering = -(dx / this.maxDist);
+                    if (dist > this.maxDist) { const angle = Math.atan2(dy, dx); dx = Math.cos(angle) * this.maxDist; dy = Math.sin(angle) * this.maxDist; }
+                    knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`; analogSteering = -(dx / this.maxDist);
                 }, { passive: false });
-
-                const end = (e) => {
-                    this.active = false;
-                    base.style.display = 'none';
-                    analogSteering = 0;
-                };
-                zone.addEventListener('touchend', end);
-                zone.addEventListener('touchcancel', end);
+                const end = () => { this.active = false; base.style.display = 'none'; analogSteering = 0; };
+                zone.addEventListener('touchend', end); zone.addEventListener('touchcancel', end);
             }
         };
 
-        // --- BUTTON BINDINGS ---
-        function setupTouchControls() {
-            // Force display on mobile devices is handled by CSS @media (pointer: coarse)
-            // But we can force it for testing if needed
-            // document.getElementById('mobile-controls').style.display = 'block';
-
-            joystick.init();
-
-            const bindBtn = (id, key) => {
-                const btn = document.getElementById(id);
-                const start = (e) => {
-                    e.preventDefault();
-                    keys[key] = true;
-                    btn.classList.add('active');
-                    sfx.init();
-                    if(window.navigator.vibrate) window.navigator.vibrate(10);
-                };
-                const end = (e) => {
-                    e.preventDefault();
-                    keys[key] = false;
-                    btn.classList.remove('active');
-                };
-                btn.addEventListener('touchstart', start, { passive: false });
-                btn.addEventListener('touchend', end, { passive: false });
-            };
-
-            bindBtn('btn-gas', 'w');
-            bindBtn('btn-brake', 's');
-            bindBtn('btn-jump', 'space');
-        }
-
-        // --- AUDIO ENGINE ---
         const sfx = {
             ctx: null, engineOsc: null, engineGain: null, filter: null, noiseBuffer: null,
             init: function() {
@@ -398,19 +284,10 @@
                 this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
                 const data = this.noiseBuffer.getChannelData(0);
                 for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-
-                this.engineOsc = this.ctx.createOscillator();
-                this.engineOsc.type = 'sawtooth';
-                this.engineOsc.frequency.value = 60;
-                this.engineGain = this.ctx.createGain();
-                this.engineGain.gain.value = 0;
-                this.filter = this.ctx.createBiquadFilter();
-                this.filter.type = 'lowpass';
-                this.filter.frequency.value = 400;
-
-                this.engineOsc.connect(this.filter);
-                this.filter.connect(this.engineGain);
-                this.engineGain.connect(this.ctx.destination);
+                this.engineOsc = this.ctx.createOscillator(); this.engineOsc.type = 'sawtooth'; this.engineOsc.frequency.value = 60;
+                this.engineGain = this.ctx.createGain(); this.engineGain.gain.value = 0;
+                this.filter = this.ctx.createBiquadFilter(); this.filter.type = 'lowpass'; this.filter.frequency.value = 400;
+                this.engineOsc.connect(this.filter); this.filter.connect(this.engineGain); this.engineGain.connect(this.ctx.destination);
                 this.engineOsc.start();
             },
             updateEngine: function(speedPercent) {
@@ -438,52 +315,45 @@
                 filter.frequency.setValueAtTime(400, this.ctx.currentTime); filter.frequency.linearRampToValueAtTime(1000, this.ctx.currentTime + 0.2);
                 src.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
                 src.start();
+            },
+            playCollect: function() {
+                if (!this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.5);
             }
         };
 
         function init() {
             const container = document.getElementById('canvas-container');
-
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87CEEB); 
-            scene.fog = new THREE.Fog(0xdcb183, 20, 200); 
-
+            scene = new THREE.Scene(); scene.background = new THREE.Color(0x87CEEB); scene.fog = new THREE.Fog(0xdcb183, 20, 200); 
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-
             renderer = new THREE.WebGLRenderer({ antialias: true, highp: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.1;
+            renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
             container.appendChild(renderer.domElement);
-
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-            scene.add(ambientLight);
-
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
-            dirLight.position.set(50, 100, 50);
-            dirLight.castShadow = true;
-            dirLight.shadow.mapSize.width = 4096; 
-            dirLight.shadow.mapSize.height = 4096;
-            dirLight.shadow.bias = -0.0001;
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1.5); dirLight.position.set(50, 100, 50); dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 4096; dirLight.shadow.mapSize.height = 4096; dirLight.shadow.bias = -0.0001;
             scene.add(dirLight);
 
             createTerrain();
+            createRings(); // Add Rings
             loadModels();
 
             window.addEventListener('resize', onWindowResize);
             document.addEventListener('keydown', (e) => { onKey(e, true); sfx.init(); });
             document.addEventListener('keyup', (e) => onKey(e, false));
-            document.addEventListener('mousedown', () => sfx.init()); 
-            document.addEventListener('touchstart', () => sfx.init()); 
-            
-            const camInd = document.getElementById('camera-indicator');
-            camInd.addEventListener('click', (e) => { e.stopPropagation(); switchCamera(); });
-
+            const camInd = document.getElementById('camera-indicator'); camInd.addEventListener('click', (e) => { e.stopPropagation(); switchCamera(); });
             setupTouchControls();
-            
             animate();
         }
 
@@ -497,73 +367,68 @@
 
         function reportError(name) {
              const text = document.getElementById('loading-text');
-             if(text) {
-                 text.innerText = "ERROR: " + name + " NOT FOUND. USING FALLBACK.";
-                 text.className = "error-msg";
-             }
+             if(text) { text.innerText = "ERROR: " + name + " NOT FOUND. USING FALLBACK."; text.className = "error-msg"; }
+        }
+
+        function createRings() {
+            const geo = new THREE.TorusGeometry(1.5, 0.2, 8, 16);
+            const mat = new THREE.MeshStandardMaterial({ 
+                color: 0xFFD700, 
+                metalness: 1.0, 
+                roughness: 0.2,
+                emissive: 0xaa8800,
+                emissiveIntensity: 0.5
+            });
+
+            for(let i=0; i<20; i++) {
+                const ring = new THREE.Mesh(geo, mat);
+                const x = (Math.random() - 0.5) * 300;
+                const z = (Math.random() - 0.5) * 300;
+                const y = getTerrainHeight(x, z);
+                
+                ring.position.set(x, y + 2.5, z); // Float above ground
+                ring.rotation.y = Math.random() * Math.PI;
+                ring.castShadow = true;
+                
+                scene.add(ring);
+                rings.push(ring);
+            }
         }
 
         function loadModels() {
             const loader = new FBXLoader();
-            
-            bikeGroup = new THREE.Group();
-            scene.add(bikeGroup); 
+            bikeGroup = new THREE.Group(); scene.add(bikeGroup); 
 
-            // Load fbx/moto.fbx
+            // 1. Load Moto
             loader.load('fbx/moto.fbx', (object) => {
-                // SCALING: 50% smaller (0.005)
                 object.scale.set(0.005, 0.005, 0.005);
-                // ROTATION: Back faces camera.
-                object.rotation.y = Math.PI; 
-
-                object.traverse((child) => {
-                    if (child.isMesh) {
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                    }
-                });
+                object.rotation.y = 0; 
+                object.traverse((child) => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
                 bikeGroup.add(object);
                 addExhaust();
                 assetsLoaded++;
                 checkLoading();
-            }, (xhr) => {
-                if (xhr.lengthComputable) {
-                    progressMoto = (xhr.loaded / xhr.total) * 100;
-                    updateProgress();
-                } else {
-                     progressMoto = 50; updateProgress();
-                }
-            }, (error) => {
-                console.warn("Moto FBX missing.");
-                reportError("moto.fbx");
-                createFallbackBike();
-                assetsLoaded++;
-                checkLoading();
-            });
+            }, (xhr) => { if (xhr.lengthComputable) { progressMoto = (xhr.loaded / xhr.total) * 100; updateProgress(); } else { progressMoto = 50; updateProgress(); }
+            }, (error) => { console.warn("Moto FBX missing."); reportError("moto.fbx"); createFallbackBike(); assetsLoaded++; checkLoading(); });
 
-            // 2. TREE SETUP
+            // 2. Load FBX Tree
             loader.load('fbx/Tree.fbx', (object) => {
-                const count = 60; 
+                const count = 40; 
                 const dummy = new THREE.Object3D();
                 const transforms = [];
-                
                 for(let i=0; i<count; i++) {
                     const x = (Math.random() - 0.5) * 200;
                     const z = (Math.random() - 0.5) * 200;
                     if (Math.abs(x) < 20 && Math.abs(z) < 20) { i--; continue; } 
-                    
                     const y = getTerrainHeight(x, z);
                     const s = 0.015 * (0.8 + Math.random() * 0.5); 
-                    
                     dummy.position.set(x, y, z);
                     dummy.rotation.set(0, Math.random() * Math.PI * 2, 0); 
                     dummy.scale.set(s, s, s);
                     dummy.updateMatrix();
                     transforms.push(dummy.matrix.clone());
-
                     obstacles.push({ x: x, z: z, radius: 1.5 });
                 }
-
                 object.traverse((child) => {
                     if (child.isMesh) {
                         const instancedMesh = new THREE.InstancedMesh(child.geometry, child.material, count);
@@ -576,243 +441,165 @@
                 });
                 assetsLoaded++;
                 checkLoading();
-            }, (xhr) => {
-                if (xhr.lengthComputable) {
-                    progressTree = (xhr.loaded / xhr.total) * 100;
-                    updateProgress();
-                } else {
-                     progressTree = 50; updateProgress();
-                }
-            }, (err) => {
-                console.warn("Tree FBX missing.");
-                reportError("Tree.fbx");
-                createFallbackTrees();
-                assetsLoaded++;
-                checkLoading();
-            });
+            }, (xhr) => { if (xhr.lengthComputable) { progressTree = (xhr.loaded / xhr.total) * 100; updateProgress(); } else { progressTree = 50; updateProgress(); }
+            }, (err) => { console.warn("Tree FBX missing."); reportError("Tree.fbx"); createFallbackTrees(); assetsLoaded++; checkLoading(); });
 
+            // 3. Add Procedural Trees
+            createProceduralPines();
             createBillboardTrees();
             createRocks();
             createFences();
         }
 
+        function createProceduralPines() {
+            const trunkGeo = new THREE.CylinderGeometry(0.2, 0.4, 1.5, 5); trunkGeo.translate(0, 0.75, 0);
+            const leaves1 = new THREE.ConeGeometry(1.2, 1.5, 5); leaves1.translate(0, 2.0, 0);
+            const leaves2 = new THREE.ConeGeometry(0.9, 1.2, 5); leaves2.translate(0, 2.8, 0);
+            const leaves3 = new THREE.ConeGeometry(0.6, 1.0, 5); leaves3.translate(0, 3.5, 0);
+            const count = 40;
+            const dummy = new THREE.Object3D();
+            const trunkMat = new THREE.MeshStandardMaterial({color: 0x3d2817});
+            const leafMat = new THREE.MeshStandardMaterial({color: 0x1a472a});
+            const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
+            const leafGeo = BufferGeometryUtils.mergeGeometries([leaves1, leaves2, leaves3]);
+            const leafMesh = new THREE.InstancedMesh(leafGeo, leafMat, count);
+            trunkMesh.castShadow = true; trunkMesh.receiveShadow = true;
+            leafMesh.castShadow = true; leafMesh.receiveShadow = true;
+            for(let i=0; i<count; i++) {
+                const x = (Math.random() - 0.5) * 300; const z = (Math.random() - 0.5) * 300;
+                if(Math.abs(x) < 20 && Math.abs(z) < 20) { i--; continue; }
+                const y = getTerrainHeight(x, z); const s = 1.0 + Math.random() * 0.5;
+                dummy.position.set(x, y, z); dummy.rotation.y = Math.random() * Math.PI; dummy.scale.set(s,s,s); dummy.updateMatrix();
+                trunkMesh.setMatrixAt(i, dummy.matrix); leafMesh.setMatrixAt(i, dummy.matrix);
+                obstacles.push({x:x, z:z, radius: 1.0});
+            }
+            scene.add(trunkMesh); scene.add(leafMesh);
+        }
+
         function createFallbackBike() {
-            const geo = new THREE.BoxGeometry(0.5, 0.5, 1);
-            const mat = new THREE.MeshStandardMaterial({color: 0xff0000});
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.position.y = 0.5;
-            bikeGroup.add(mesh);
-            addExhaust();
+            const geo = new THREE.BoxGeometry(0.5, 0.5, 1); const mat = new THREE.MeshStandardMaterial({color: 0xff0000}); const mesh = new THREE.Mesh(geo, mat); mesh.position.y = 0.5; bikeGroup.add(mesh); addExhaust();
         }
-
         function createFallbackTrees() {
-            const geo = new THREE.ConeGeometry(1, 4, 8);
-            const mat = new THREE.MeshStandardMaterial({color: 0x00ff00});
-            for(let i=0; i<30; i++) {
-                 const x = (Math.random() - 0.5) * 200;
-                 const z = (Math.random() - 0.5) * 200;
-                 const y = getTerrainHeight(x, z);
-                 const mesh = new THREE.Mesh(geo, mat);
-                 mesh.position.set(x, y+2, z);
-                 scene.add(mesh);
-                 obstacles.push({ x: x, z: z, radius: 1.5 });
-            }
+            const geo = new THREE.ConeGeometry(1, 4, 8); const mat = new THREE.MeshStandardMaterial({color: 0x00ff00});
+            for(let i=0; i<30; i++) { const x = (Math.random() - 0.5) * 200; const z = (Math.random() - 0.5) * 200; const y = getTerrainHeight(x, z); const mesh = new THREE.Mesh(geo, mat); mesh.position.set(x, y+2, z); scene.add(mesh); obstacles.push({ x: x, z: z, radius: 1.5 }); }
         }
-
-        function addExhaust() {
-            const exhaustPoint = new THREE.Object3D(); 
-            exhaustPoint.position.set(0, 0.5, -1.2); 
-            exhaustPoint.name = "exhaust"; 
-            bikeGroup.add(exhaustPoint);
-        }
-
-        function checkLoading() {
-            if (assetsLoaded >= assetsTotal) {
-                setTimeout(() => {
-                    document.getElementById('loading').style.display = 'none';
-                }, 500);
-            }
+        function addExhaust() { const exhaustPoint = new THREE.Object3D(); exhaustPoint.position.set(0, 0.5, -1.2); exhaustPoint.name = "exhaust"; bikeGroup.add(exhaustPoint); }
+        function checkLoading() { if (assetsLoaded >= assetsTotal) { setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 500); } }
+        
+        function setupTouchControls() {
+            joystick.init();
+            const bindBtn = (id, key) => {
+                const btn = document.getElementById(id);
+                const start = (e) => { e.preventDefault(); keys[key] = true; btn.classList.add('active'); sfx.init(); if(window.navigator.vibrate) window.navigator.vibrate(10); };
+                const end = (e) => { e.preventDefault(); keys[key] = false; btn.classList.remove('active'); };
+                btn.addEventListener('touchstart', start, { passive: false }); btn.addEventListener('touchend', end, { passive: false });
+            };
+            bindBtn('btn-gas', 'w'); bindBtn('btn-brake', 's'); bindBtn('btn-jump', 'space');
         }
 
         function createTerrain() {
-            const geometry = new THREE.PlaneGeometry(400, 400, 200, 200);
-            geometry.rotateX(-Math.PI / 2);
-            const positions = geometry.attributes.position.array;
-            
+            const geometry = new THREE.PlaneGeometry(400, 400, 400, 400); geometry.rotateX(-Math.PI / 2); const positions = geometry.attributes.position.array;
             for (let i = 0; i < positions.length; i += 3) {
-                const x = positions[i];
-                const z = positions[i + 2];
-                const y = (Math.sin(x * 0.05) * 4) + (Math.cos(z * 0.05) * 4) + (Math.sin(x * 0.2 + z * 0.1) * 1.5) + (Math.random() * 0.3);
-                const dist = Math.sqrt(x*x + z*z);
-                let bowl = 0;
-                if(dist > 50) bowl = (dist - 50) * 0.15;
-                positions[i + 1] = y + bowl;
+                const x = positions[i]; const z = positions[i + 2];
+                const y = (Math.sin(x * 0.03) * 5) + (Math.cos(z * 0.03) * 5) + (Math.sin(x * 0.1 + z * 0.1) * 1.5) + (Math.random() * 0.2);
+                const dist = Math.sqrt(x*x + z*z); let bowl = 0; if(dist > 100) bowl = (dist - 100) * 0.15; positions[i + 1] = y + bowl;
             }
             geometry.computeVertexNormals();
-
-            const canvasDiffuse = document.createElement('canvas'); canvasDiffuse.width = 1024; canvasDiffuse.height = 1024;
-            const ctxD = canvasDiffuse.getContext('2d');
-            const canvasRough = document.createElement('canvas'); canvasRough.width = 1024; canvasRough.height = 1024;
-            const ctxR = canvasRough.getContext('2d');
-
-            ctxD.fillStyle = '#C2B280'; ctxD.fillRect(0,0,1024,1024);
-            ctxR.fillStyle = '#FF0000'; ctxR.fillRect(0,0,1024,1024); 
-
-            for(let i=0; i<40; i++) {
-                const cx = Math.random() * 1024; const cy = Math.random() * 1024; const rad = 50 + Math.random() * 100;
-                const gradD = ctxD.createRadialGradient(cx, cy, 0, cx, cy, rad);
-                gradD.addColorStop(0, '#5C4033'); gradD.addColorStop(1, 'rgba(92, 64, 51, 0)');
-                ctxD.fillStyle = gradD; ctxD.beginPath(); ctxD.arc(cx, cy, rad, 0, Math.PI*2); ctxD.fill();
-                const gradR = ctxR.createRadialGradient(cx, cy, 0, cx, cy, rad);
-                gradR.addColorStop(0, '#333333'); gradR.addColorStop(1, '#FFFFFF');
-                ctxR.fillStyle = gradR; ctxR.beginPath(); ctxR.arc(cx, cy, rad, 0, Math.PI*2); ctxR.fill();
+            const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 1024; const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#8B5A2B'; ctx.fillRect(0,0,1024,1024);
+            for(let i=0; i<50000; i++) {
+                const shade = Math.random(); if(shade > 0.6) ctx.fillStyle = '#A07040'; else if (shade > 0.3) ctx.fillStyle = '#5C4033'; else ctx.fillStyle = '#556B2F';
+                const x = Math.random() * 1024; const y = Math.random() * 1024; const size = Math.random() * 3 + 1; ctx.fillRect(x, y, size, size);
             }
-
-            const texDiffuse = new THREE.CanvasTexture(canvasDiffuse);
-            texDiffuse.wrapS = THREE.RepeatWrapping; texDiffuse.wrapT = THREE.RepeatWrapping; texDiffuse.repeat.set(20, 20);
-            const texRough = new THREE.CanvasTexture(canvasRough);
-            texRough.wrapS = THREE.RepeatWrapping; texRough.wrapT = THREE.RepeatWrapping; texRough.repeat.set(20, 20);
-
-            const material = new THREE.MeshStandardMaterial({ map: texDiffuse, roughnessMap: texRough, roughness: 1.0, metalness: 0.0, side: THREE.DoubleSide });
-            terrainMesh = new THREE.Mesh(geometry, material);
-            terrainMesh.receiveShadow = true;
-            scene.add(terrainMesh);
+            const tex = new THREE.CanvasTexture(canvas); tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(10, 10);
+            const material = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 });
+            terrainMesh = new THREE.Mesh(geometry, material); terrainMesh.receiveShadow = true; scene.add(terrainMesh);
         }
 
-        function getTerrainHeight(x, z) {
-            const raycaster = new THREE.Raycaster();
-            raycaster.set(new THREE.Vector3(x, 100, z), new THREE.Vector3(0, -1, 0));
-            const intersects = raycaster.intersectObject(terrainMesh);
-            return intersects.length > 0 ? intersects[0].point.y : 0;
-        }
-
+        function getTerrainHeight(x, z) { const raycaster = new THREE.Raycaster(); raycaster.set(new THREE.Vector3(x, 100, z), new THREE.Vector3(0, -1, 0)); const intersects = raycaster.intersectObject(terrainMesh); return intersects.length > 0 ? intersects[0].point.y : 0; }
         function createBillboardTrees() {
-            const billboardGeo = new THREE.PlaneGeometry(8, 12);
-            const billboardMat = new THREE.MeshBasicMaterial({ color: 0x1a5c1a, side: THREE.DoubleSide, transparent:true, opacity:0.8 });
-            for(let i=0; i<50; i++) {
-                const angle = Math.random() * Math.PI * 2; const rad = 120 + Math.random() * 80;
-                const x = Math.cos(angle) * rad; const z = Math.sin(angle) * rad; const y = getTerrainHeight(x, z) + 6;
-                const bb = new THREE.Mesh(billboardGeo, billboardMat); bb.position.set(x,y,z); scene.add(bb); billboardTrees.push(bb);
-            }
+            const billboardGeo = new THREE.PlaneGeometry(8, 12); const billboardMat = new THREE.MeshBasicMaterial({ color: 0x1a5c1a, side: THREE.DoubleSide, transparent:true, opacity:0.8 });
+            for(let i=0; i<50; i++) { const angle = Math.random() * Math.PI * 2; const rad = 150 + Math.random() * 50; const x = Math.cos(angle) * rad; const z = Math.sin(angle) * rad; const y = getTerrainHeight(x, z) + 6; const bb = new THREE.Mesh(billboardGeo, billboardMat); bb.position.set(x,y,z); scene.add(bb); billboardTrees.push(bb); }
         }
-
         function createRocks() {
              const rockGeo = new THREE.DodecahedronGeometry(1, 0); const rockMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.9 });
-            for(let i=0; i< 25; i++) {
-                const x = (Math.random() - 0.5) * 300; const z = (Math.random() - 0.5) * 300; const y = getTerrainHeight(x, z);
-                const rock = new THREE.Mesh(rockGeo, rockMat); rock.position.set(x, y + 0.5, z); rock.scale.set(1 + Math.random(), 1 + Math.random(), 1 + Math.random()); rock.rotation.set(Math.random(), Math.random(), Math.random()); rock.castShadow = true; scene.add(rock);
-                
-                // Add collision for Rocks
-                obstacles.push({ x: x, z: z, radius: 1.0 });
-            }
+            for(let i=0; i< 30; i++) { const x = (Math.random() - 0.5) * 350; const z = (Math.random() - 0.5) * 350; const y = getTerrainHeight(x, z); const rock = new THREE.Mesh(rockGeo, rockMat); rock.position.set(x, y + 0.5, z); rock.scale.set(1 + Math.random(), 1 + Math.random(), 1 + Math.random()); rock.rotation.set(Math.random(), Math.random(), Math.random()); rock.castShadow = true; scene.add(rock); obstacles.push({ x: x, z: z, radius: 1.0 }); }
         }
-
         function createFences() {
-            const postGeo = new THREE.CylinderGeometry(0.1, 0.1, 1.5, 6); const postMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b });
-            const railGeo = new THREE.BoxGeometry(0.05, 0.05, 5);
-            for(let i=0; i<10; i++) {
-                const x = -30 + (i * 5); const z = 20; const y = getTerrainHeight(x, z);
-                const post = new THREE.Mesh(postGeo, postMat); post.position.set(x, y+0.75, z); post.castShadow = true; scene.add(post);
-                if (i < 9) {
-                    const rail = new THREE.Mesh(railGeo, postMat); rail.position.set(x + 2.5, y + 1.2, z); scene.add(rail);
-                    const rail2 = new THREE.Mesh(railGeo, postMat); rail2.position.set(x + 2.5, y + 0.8, z); scene.add(rail2);
-                }
-            }
+            const postGeo = new THREE.CylinderGeometry(0.1, 0.1, 1.5, 6); const postMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b }); const railGeo = new THREE.BoxGeometry(0.05, 0.05, 5);
+            for(let i=0; i<10; i++) { const x = -30 + (i * 5); const z = 20; const y = getTerrainHeight(x, z); const post = new THREE.Mesh(postGeo, postMat); post.position.set(x, y+0.75, z); post.castShadow = true; scene.add(post); if (i < 9) { const rail = new THREE.Mesh(railGeo, postMat); rail.position.set(x + 2.5, y + 1.2, z); scene.add(rail); const rail2 = new THREE.Mesh(railGeo, postMat); rail2.position.set(x + 2.5, y + 0.8, z); scene.add(rail2); } }
         }
-
         function createDust() {
-            if(!bikeGroup) return;
-            const exhaust = bikeGroup.getObjectByName("exhaust");
-            if (!exhaust) return; if (Math.abs(speed) < 0.1) return;
-            const pos = new THREE.Vector3(); exhaust.getWorldPosition(pos);
-            const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2); const mat = new THREE.MeshBasicMaterial({ color: 0x8b7e66, transparent: true, opacity: 0.4 });
-            const p = new THREE.Mesh(geo, mat); p.position.copy(pos); p.position.x += (Math.random() - 0.5) * 0.3;
-            const gH = getTerrainHeight(pos.x, pos.z); if(p.position.y < gH) p.position.y = gH + 0.2;
-            scene.add(p); particles.push({ mesh: p, life: 1.0 });
+            if(!bikeGroup) return; const exhaust = bikeGroup.getObjectByName("exhaust"); if (!exhaust) return; if (Math.abs(speed) < 0.1) return;
+            const pos = new THREE.Vector3(); exhaust.getWorldPosition(pos); const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2); const mat = new THREE.MeshBasicMaterial({ color: 0x8b7e66, transparent: true, opacity: 0.4 }); const p = new THREE.Mesh(geo, mat); p.position.copy(pos); p.position.x += (Math.random() - 0.5) * 0.3; const gH = getTerrainHeight(pos.x, pos.z); if(p.position.y < gH) p.position.y = gH + 0.2; scene.add(p); particles.push({ mesh: p, life: 1.0 });
         }
+        function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { const p = particles[i]; p.life -= 0.02; p.mesh.position.y += 0.02; p.mesh.scale.multiplyScalar(1.05); p.mesh.material.opacity = p.life * 0.4; p.mesh.rotation.x += 0.1; if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); } } }
+        function onKey(e, pressed) { const k = e.key.toLowerCase(); if (k === 'w' || k === 'arrowup') keys.w = pressed; if (k === 's' || k === 'arrowdown') keys.s = pressed; if (k === 'a' || k === 'arrowleft') keys.a = pressed; if (k === 'd' || k === 'arrowright') keys.d = pressed; if (k === ' ') keys.space = pressed; }
+        function switchCamera() { activeCameraMode = activeCameraMode === 0 ? 1 : 0; const ind = document.getElementById('camera-indicator'); ind.innerText = activeCameraMode === 0 ? "CAM: TOP DOWN" : "CAM: 3RD PERSON"; }
+        function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
+        function checkCollisions(newX, newZ) { const bikeRadius = 0.5; for(let obs of obstacles) { const dx = newX - obs.x; const dz = newZ - obs.z; const dist = Math.sqrt(dx*dx + dz*dz); if (dist < (bikeRadius + obs.radius)) return true; } return false; }
 
-        function updateParticles() {
-            for (let i = particles.length - 1; i >= 0; i--) {
-                const p = particles[i]; p.life -= 0.02; p.mesh.position.y += 0.02; p.mesh.scale.multiplyScalar(1.05); p.mesh.material.opacity = p.life * 0.4; p.mesh.rotation.x += 0.1;
-                if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); }
-            }
-        }
-
-        function onKey(e, pressed) {
-            const k = e.key.toLowerCase();
-            if (k === 'w' || k === 'arrowup') keys.w = pressed;
-            if (k === 's' || k === 'arrowdown') keys.s = pressed;
-            if (k === 'a' || k === 'arrowleft') keys.a = pressed;
-            if (k === 'd' || k === 'arrowright') keys.d = pressed;
-            if (k === ' ') keys.space = pressed;
-        }
-
-        function switchCamera() {
-            activeCameraMode = activeCameraMode === 0 ? 1 : 0;
-            const ind = document.getElementById('camera-indicator');
-            ind.innerText = activeCameraMode === 0 ? "CAM: TOP DOWN" : "CAM: 3RD PERSON";
-        }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        // --- PHYSICS CHECK ---
-        function checkCollisions(newX, newZ) {
-            // Bike Radius approx 0.5
-            const bikeRadius = 0.5;
-            
-            for(let obs of obstacles) {
-                const dx = newX - obs.x;
-                const dz = newZ - obs.z;
-                const dist = Math.sqrt(dx*dx + dz*dz);
+        function checkRings() {
+            const playerPos = bikeGroup.position;
+            for(let i = rings.length - 1; i >= 0; i--) {
+                const ring = rings[i];
+                ring.rotation.y += 0.05; // Spin animation
                 
-                if (dist < (bikeRadius + obs.radius)) {
-                    return true; // Collision detected
+                // Simple collision check
+                const dx = playerPos.x - ring.position.x;
+                const dy = (playerPos.y + 0.5) - ring.position.y; // Check height roughly
+                const dz = playerPos.z - ring.position.z;
+                const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+                if (dist < 2.0) {
+                    // Collect!
+                    scene.remove(ring);
+                    rings.splice(i, 1);
+                    sfx.playCollect();
+                    battery = Math.min(100, battery + RING_CHARGE);
                 }
             }
-            return false;
+        }
+
+        function updateBattery() {
+            if (Math.abs(speed) > 0.01) {
+                battery -= BATTERY_DRAIN;
+                if (battery < 0) battery = 0;
+            }
+            
+            // UI Update
+            const bar = document.getElementById('battery-bar');
+            const txt = document.getElementById('battery-text');
+            bar.style.width = battery + "%";
+            txt.innerText = "BATTERY: " + Math.round(battery) + "%";
+            
+            // Speed Limit if Battery Low
+            if (battery <= 0) {
+                speed *= 0.95; // Slow to stop
+            }
         }
 
         function animate(time) {
             requestAnimationFrame(animate);
-
             if (time - lastTime >= 1000) { document.getElementById('fps').innerText = frameCount + " FPS"; frameCount = 0; lastTime = time; }
             frameCount++;
 
-            // Acceleration
-            if (keys.w) speed += ACCEL;
+            // Acceleration (Only works if battery > 0)
+            if (battery > 0) {
+                if (keys.w) speed += ACCEL;
+            }
             if (keys.s) speed -= ACCEL;
             speed *= FRICTION;
             
-            // Turning (Mix keyboard and analog)
-            let turnInput = 0;
-            if (keys.a) turnInput += 1;
-            if (keys.d) turnInput -= 1;
-            turnInput += analogSteering; 
-
-            if (bikeGroup && Math.abs(speed) > 0.05) {
-                bikeGroup.rotation.y += turnInput * TURN_SPEED;
-            }
+            let turnInput = 0; if (keys.a) turnInput += 1; if (keys.d) turnInput -= 1; turnInput += analogSteering; 
+            if (bikeGroup && Math.abs(speed) > 0.05) bikeGroup.rotation.y += turnInput * TURN_SPEED;
 
             if (bikeGroup) {
-                // Calculate NEXT position
-                const nextVel = new THREE.Vector3(0, 0, speed);
-                nextVel.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                const nextX = bikeGroup.position.x + nextVel.x;
-                const nextZ = bikeGroup.position.z + nextVel.z;
+                const nextVel = new THREE.Vector3(0, 0, speed); nextVel.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
+                const nextX = bikeGroup.position.x + nextVel.x; const nextZ = bikeGroup.position.z + nextVel.z;
 
-                // CHECK COLLISION BEFORE MOVING
-                if (checkCollisions(nextX, nextZ)) {
-                    // STOP and BOUNCE
-                    speed = -speed * 0.5;
-                    sfx.playLand(1.0); // reused sound for impact
-                } else {
-                    // SAFE TO MOVE
-                    velocity.set(0, 0, speed);
-                    velocity.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                    bikeGroup.position.add(velocity);
-                }
+                if (checkCollisions(nextX, nextZ)) { speed = -speed * 0.5; sfx.playLand(1.0); } 
+                else { velocity.set(0, 0, speed); velocity.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y); bikeGroup.position.add(velocity); }
 
                 if (bikeGroup.position.x > MAP_LIMIT) { bikeGroup.position.x = MAP_LIMIT; speed = 0; }
                 if (bikeGroup.position.x < -MAP_LIMIT) { bikeGroup.position.x = -MAP_LIMIT; speed = 0; }
@@ -820,43 +607,25 @@
                 if (bikeGroup.position.z < -MAP_LIMIT) { bikeGroup.position.z = -MAP_LIMIT; speed = 0; }
 
                 sfx.updateEngine(Math.abs(speed));
+                checkRings();
+                updateBattery();
 
                 const groundH = getTerrainHeight(bikeGroup.position.x, bikeGroup.position.z);
-                verticalVelocity -= GRAVITY;
-                bikeGroup.position.y += verticalVelocity;
-
+                verticalVelocity -= GRAVITY; bikeGroup.position.y += verticalVelocity;
                 if (bikeGroup.position.y > groundH + 0.2) isAirborne = true;
-
-                if (bikeGroup.position.y < groundH) {
-                    bikeGroup.position.y = groundH;
-                    if (isAirborne) { sfx.playLand(Math.abs(verticalVelocity) * 2); isAirborne = false; }
-                    verticalVelocity = 0;
-                    if (keys.space) { verticalVelocity = JUMP_FORCE; sfx.playJump(); isAirborne = true; }
-                }
+                if (bikeGroup.position.y < groundH) { bikeGroup.position.y = groundH; if (isAirborne) { sfx.playLand(Math.abs(verticalVelocity) * 2); isAirborne = false; } verticalVelocity = 0; if (keys.space && battery > 0) { verticalVelocity = JUMP_FORCE; sfx.playJump(); isAirborne = true; } }
 
                 const aheadV = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                const nextXPos = bikeGroup.position.x + aheadV.x;
-                const nextZPos = bikeGroup.position.z + aheadV.z;
-                const nextH = getTerrainHeight(nextXPos, nextZPos);
-                const angle = Math.atan2(nextH - groundH, 1.0);
-                bikeGroup.rotation.x = THREE.MathUtils.lerp(bikeGroup.rotation.x, -angle, 0.1);
-                
-                // Roll based on turn
-                const targetRoll = turnInput * 0.3;
-                bikeGroup.rotation.z = THREE.MathUtils.lerp(bikeGroup.rotation.z, targetRoll, 0.1);
+                const nextXPos = bikeGroup.position.x + aheadV.x; const nextZPos = bikeGroup.position.z + aheadV.z; const nextH = getTerrainHeight(nextXPos, nextZPos);
+                const angle = Math.atan2(nextH - groundH, 1.0); bikeGroup.rotation.x = THREE.MathUtils.lerp(bikeGroup.rotation.x, -angle, 0.1);
+                const targetRoll = turnInput * 0.3; bikeGroup.rotation.z = THREE.MathUtils.lerp(bikeGroup.rotation.z, targetRoll, 0.1);
 
                 const targetPos = bikeGroup.position.clone();
                 if (activeCameraMode === 1) {
                     const offset = new THREE.Vector3(0, 3, -6); offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                    const camPos = targetPos.clone().add(offset);
-                    const camGroundH = getTerrainHeight(camPos.x, camPos.z);
-                    if (camPos.y < camGroundH + 1.0) camPos.y = camGroundH + 1.0;
-                    camera.position.lerp(camPos, 0.1);
-                    camera.lookAt(targetPos.x, targetPos.y + 1, targetPos.z);
-                } else {
-                    camera.position.set(targetPos.x, targetPos.y + 25, targetPos.z + 5);
-                    camera.lookAt(targetPos);
-                }
+                    const camPos = targetPos.clone().add(offset); const camGroundH = getTerrainHeight(camPos.x, camPos.z); if (camPos.y < camGroundH + 1.0) camPos.y = camGroundH + 1.0;
+                    camera.position.lerp(camPos, 0.1); camera.lookAt(targetPos.x, targetPos.y + 1, targetPos.z);
+                } else { camera.position.set(targetPos.x, targetPos.y + 25, targetPos.z + 5); camera.lookAt(targetPos); }
             }
 
             billboardTrees.forEach(bb => bb.lookAt(camera.position));
@@ -869,4 +638,5 @@
     </script>
 </body>
 </html>
+
 
