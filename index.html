@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Motocross Madness 1998 - Instanced FBX</title>
+    <title>Tesla Madness 1998 - Instanced FBX</title>
     
     <script type="importmap">
     {
@@ -70,21 +70,52 @@
             border-radius: 4px;
         }
 
+        /* LOADING SCREEN STYLES */
         #loading {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: white;
-            font-size: clamp(16px, 5vw, 24px);
+            width: clamp(280px, 60vw, 500px);
             background: black;
             padding: 20px;
             border: 2px solid #ffcc00;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
             z-index: 100;
             text-align: center;
+            box-shadow: 0 0 20px rgba(255, 204, 0, 0.2);
+        }
+
+        .loading-title {
+            color: white;
+            font-size: clamp(16px, 4vw, 20px);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .progress-track {
+            width: 100%;
+            height: 20px;
+            background: #222;
+            border: 1px solid #555;
+            margin-bottom: 10px;
+            position: relative;
+        }
+
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background: #ffcc00;
+            transition: width 0.2s;
+        }
+
+        #loading-text {
+            color: #aaa;
+            font-size: 12px;
         }
 
         .touch-controls {
@@ -147,10 +178,17 @@
 </head>
 <body>
 
-    <div id="loading">LOADING MODELS & INSTANCING...</div>
+    <!-- LOADING SCREEN -->
+    <div id="loading">
+        <div class="loading-title">LOADING ASSETS...</div>
+        <div class="progress-track">
+            <div id="progress-bar"></div>
+        </div>
+        <div id="loading-text">CONNECTING TO SERVER...</div>
+    </div>
 
     <div id="ui-layer">
-        <h1>MOTOCROSS MADNESS '98</h1>
+        <h1>TESLA MADNESS '98</h1>
         <p>TECH: <span class="accent">GPU INSTANCING</span> | SFX: <span class="blink">READY</span></p>
         <p class="desktop-hint">KEYBOARD: WASD | SPACE</p>
         <p class="mobile-hint">TOUCH: Controls Active</p>
@@ -194,6 +232,10 @@
         let isAirborne = false;
         let assetsLoaded = 0;
         
+        // Loading Progress Variables
+        let progressMoto = 0;
+        let progressTree = 0;
+
         const MAX_SPEED = 1.2;
         const ACCEL = 0.02;
         const FRICTION = 0.98;
@@ -304,6 +346,16 @@
             animate();
         }
 
+        function updateProgress() {
+            // Moto counts for 50%, Tree counts for 50%
+            const total = Math.round((progressMoto + progressTree) / 2);
+            const bar = document.getElementById('progress-bar');
+            const text = document.getElementById('loading-text');
+            
+            if(bar) bar.style.width = total + "%";
+            if(text) text.innerText = "DOWNLOADING... " + total + "%";
+        }
+
         function loadModels() {
             const loader = new FBXLoader();
             
@@ -329,31 +381,35 @@
 
                 assetsLoaded++;
                 checkLoading();
-            }, undefined, (error) => console.warn("Moto missing"));
+            }, (xhr) => {
+                // Progress Callback
+                if (xhr.lengthComputable) {
+                    progressMoto = (xhr.loaded / xhr.total) * 100;
+                    updateProgress();
+                }
+            }, (error) => console.warn("Moto missing"));
 
             // 2. TREES - GPU INSTANCING
             loader.load('/fbx/tree.fbx', (object) => {
                 const count = 60; // Number of trees
                 const dummy = new THREE.Object3D();
                 
-                // Pre-calculate transforms
                 const transforms = [];
                 for(let i=0; i<count; i++) {
                     const x = (Math.random() - 0.5) * 200;
                     const z = (Math.random() - 0.5) * 200;
-                    if (Math.abs(x) < 20 && Math.abs(z) < 20) { i--; continue; } // Retry if too close
+                    if (Math.abs(x) < 20 && Math.abs(z) < 20) { i--; continue; } 
                     
                     const y = getTerrainHeight(x, z);
-                    const s = 0.015 * (0.8 + Math.random() * 0.5); // Randomize scale
+                    const s = 0.015 * (0.8 + Math.random() * 0.5); 
                     
                     dummy.position.set(x, y, z);
-                    dummy.rotation.set(0, Math.random() * Math.PI * 2, 0); // Random rotation
+                    dummy.rotation.set(0, Math.random() * Math.PI * 2, 0); 
                     dummy.scale.set(s, s, s);
                     dummy.updateMatrix();
                     transforms.push(dummy.matrix.clone());
                 }
 
-                // Create InstancedMesh for each mesh component in the FBX
                 object.traverse((child) => {
                     if (child.isMesh) {
                         const instancedMesh = new THREE.InstancedMesh(child.geometry, child.material, count);
@@ -371,7 +427,13 @@
                 
                 assetsLoaded++;
                 checkLoading();
-            }, undefined, (err) => console.warn("Tree FBX missing"));
+            }, (xhr) => {
+                // Progress Callback
+                if (xhr.lengthComputable) {
+                    progressTree = (xhr.loaded / xhr.total) * 100;
+                    updateProgress();
+                }
+            }, (err) => console.warn("Tree FBX missing"));
 
             createBillboardTrees();
             createRocks();
@@ -598,5 +660,3 @@
 </body>
 </html>
 
-
- 
