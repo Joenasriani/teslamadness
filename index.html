@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Tesla Madness 1998 - Physics Update</title>
+    <title>Tesla Madness 1998 - Heavy Physics</title>
     
     <script type="importmap">
     {
@@ -37,6 +37,9 @@
             z-index: 10;
             width: auto;
             max-width: 50%;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
         }
         
         h1 { 
@@ -46,6 +49,7 @@
             text-transform: uppercase; 
             font-weight: bold; 
             white-space: nowrap; 
+            line-height: 1.2;
         }
         p { margin: 5px 0; font-size: clamp(9px, 2.5vw, 14px); color: #fff; }
         .accent { color: #00ff00; }
@@ -54,7 +58,7 @@
 
         /* BATTERY BAR */
         .battery-container {
-            margin-top: 5px;
+            margin-top: 25px; 
             width: 100%;
             max-width: 200px;
             height: 12px;
@@ -70,9 +74,11 @@
         }
         #battery-text {
             position: absolute;
-            top: -18px; right: 0;
+            top: -18px; 
+            right: 0;
             font-size: clamp(9px, 2.5vw, 12px);
             color: #fff;
+            text-shadow: 1px 1px 0 #000;
         }
         
         /* RIGHT HEADER UI */
@@ -280,7 +286,8 @@
         <div id="fps">60 FPS</div>
     </div>
     
-    <div id="camera-indicator">CAM: TOP ANGLE</div>
+    <!-- CAMERA BUTTON -->
+    <div id="camera-indicator">CAM: FAR CHASE</div>
 
     <!-- CONTROLS -->
     <div class="touch-controls">
@@ -333,13 +340,15 @@
         const FRICTION = 0.98;
         const TURN_SPEED = 0.04;
         const GRAVITY = 0.025; 
-        const JUMP_FORCE = 0.5; // Reduced jump height
+        const JUMP_FORCE = 0.22; // Reduced to ~40%
         const MAP_LIMIT = 195; 
         
         const keys = { w: false, a: false, s: false, d: false, space: false };
-        let activeCameraMode = 1; 
+        
+        // CAMERA MODES: 0=Chase, 1=Far, 2=Hood, 3=Top
+        let activeCameraMode = 0; 
         let analogSteering = 0;
-        let analogThrottle = 0; // Forward/Back from joystick
+        let analogThrottle = 0; 
 
         // --- JOYSTICK ---
         const joystick = {
@@ -360,7 +369,7 @@
                     if (dist > this.maxDist) { const angle = Math.atan2(dy, dx); dx = Math.cos(angle) * this.maxDist; dy = Math.sin(angle) * this.maxDist; }
                     knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`; 
                     analogSteering = -(dx / this.maxDist);
-                    analogThrottle = -(dy / this.maxDist); // Up is negative dy, so invert for positive throttle
+                    analogThrottle = -(dy / this.maxDist); 
                 }, { passive: false });
                 const end = () => { this.active = false; base.style.display = 'none'; analogSteering = 0; analogThrottle = 0; };
                 zone.addEventListener('touchend', end); zone.addEventListener('touchcancel', end);
@@ -386,7 +395,7 @@
             updateEngine: function(speedPercent) {
                 if (!this.ctx) return;
                 this.engineOsc.frequency.setTargetAtTime(60 + (speedPercent * 300), this.ctx.currentTime, 0.1);
-                // Reduced volume by 50%
+                // Reduced volume
                 const vol = (0.05 + (speedPercent * 0.1)) * 0.5; 
                 this.engineGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.1);
                 this.filter.frequency.setTargetAtTime(200 + (speedPercent * 3000), this.ctx.currentTime, 0.1);
@@ -441,7 +450,7 @@
             scene.add(dirLight);
 
             createTerrain();
-            createRings(); // Add Rings
+            createRings(); 
             loadModels();
 
             window.addEventListener('resize', onWindowResize);
@@ -542,9 +551,7 @@
             }, (xhr) => { if (xhr.lengthComputable) { progressTree = (xhr.loaded / xhr.total) * 100; updateProgress(); } else { progressTree = 50; updateProgress(); }
             }, (err) => { console.warn("Tree FBX missing."); reportError("Tree.fbx"); createFallbackTrees(); assetsLoaded++; checkLoading(); });
 
-            // 3. Add Procedural Trees
             createProceduralPines();
-            // Removed createBillboardTrees() as requested
             createRocks();
             createFences();
         }
@@ -632,10 +639,19 @@
         function onKey(e, pressed) { const k = e.key.toLowerCase(); if (k === 'w' || k === 'arrowup') keys.w = pressed; if (k === 's' || k === 'arrowdown') keys.s = pressed; if (k === 'a' || k === 'arrowleft') keys.a = pressed; if (k === 'd' || k === 'arrowright') keys.d = pressed; if (k === ' ') keys.space = pressed; }
         
         function switchCamera() { 
-            activeCameraMode = activeCameraMode === 0 ? 1 : 0; 
+            activeCameraMode = (activeCameraMode + 1) % 4; // Cycle 0 -> 1 -> 2 -> 3 -> 0
             const ind = document.getElementById('camera-indicator'); 
-            // Swapped the text logic to indicate "Switch To..." 
-            ind.innerText = activeCameraMode === 0 ? "CAM: 3RD PERSON" : "CAM: TOP ANGLE"; 
+            
+            // Text shows NEXT available mode
+            let nextMode = (activeCameraMode + 1) % 4;
+            let label = "";
+            switch(nextMode) {
+                case 0: label = "CAM: CHASE"; break;
+                case 1: label = "CAM: FAR CHASE"; break;
+                case 2: label = "CAM: HOOD / FPV"; break;
+                case 3: label = "CAM: TOP DOWN"; break;
+            }
+            ind.innerText = label;
         }
         
         function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
@@ -730,11 +746,35 @@
                 const targetRoll = turnInput * 0.3; bikeGroup.rotation.z = THREE.MathUtils.lerp(bikeGroup.rotation.z, targetRoll, 0.1);
 
                 const targetPos = bikeGroup.position.clone();
-                if (activeCameraMode === 1) {
-                    const offset = new THREE.Vector3(0, 3, -6); offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                    const camPos = targetPos.clone().add(offset); const camGroundH = getTerrainHeight(camPos.x, camPos.z); if (camPos.y < camGroundH + 1.0) camPos.y = camGroundH + 1.0;
-                    camera.position.lerp(camPos, 0.1); camera.lookAt(targetPos.x, targetPos.y + 1, targetPos.z);
-                } else { camera.position.set(targetPos.x, targetPos.y + 25, targetPos.z + 5); camera.lookAt(targetPos); }
+                let camOffset = new THREE.Vector3();
+                let lookOffset = new THREE.Vector3(0, 1, 0);
+
+                // --- MULTI CAM LOGIC ---
+                switch(activeCameraMode) {
+                    case 0: // Chase Standard
+                        camOffset.set(0, 3, -6);
+                        break;
+                    case 1: // Far Chase
+                        camOffset.set(0, 6, -12);
+                        break;
+                    case 2: // Hood / FPV
+                        camOffset.set(0, 1.2, 0.5);
+                        lookOffset.set(0, 1.2, 5); // Look further ahead
+                        break;
+                    case 3: // Top Down
+                        camera.position.set(targetPos.x, targetPos.y + 25, targetPos.z + 5);
+                        camera.lookAt(targetPos);
+                        break;
+                }
+
+                if (activeCameraMode !== 3) {
+                    camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
+                    const camPos = targetPos.clone().add(camOffset);
+                    const camGroundH = getTerrainHeight(camPos.x, camPos.z);
+                    if (camPos.y < camGroundH + 1.0) camPos.y = camGroundH + 1.0;
+                    camera.position.lerp(camPos, 0.1);
+                    camera.lookAt(targetPos.clone().add(lookOffset));
+                }
             }
 
             // removed billboardTrees render call as it's undefined
