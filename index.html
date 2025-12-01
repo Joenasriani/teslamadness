@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Tesla Madness 1998 - Heavy Physics</title>
+    <title>Tesla Madness 1998 - Music Update</title>
     
     <script type="importmap">
     {
@@ -92,12 +92,14 @@
             pointer-events: none;
             font-size: clamp(12px, 3.5vw, 16px);
             max-width: 40%;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 5px;
         }
 
-        #camera-indicator {
-            position: absolute;
-            top: max(70px, calc(env(safe-area-inset-top) + 50px)); 
-            right: max(20px, env(safe-area-inset-right));
+        /* BUTTONS (Camera & Music) */
+        .hud-btn {
             background: rgba(0, 0, 0, 0.5);
             border: 2px solid #ffcc00;
             padding: 5px 8px;
@@ -107,9 +109,15 @@
             font-size: clamp(9px, 2.5vw, 12px);
             pointer-events: auto; 
             cursor: pointer;
-            z-index: 20;
             border-radius: 4px;
             white-space: nowrap;
+            margin-top: 5px;
+            text-shadow: 1px 1px 0 #000;
+        }
+        
+        .hud-btn.active {
+            background: rgba(255, 204, 0, 0.2);
+            box-shadow: 0 0 5px #ffcc00;
         }
 
         /* LOADING SCREEN */
@@ -188,23 +196,13 @@
 
         /* RIGHT: PEDALS */
         #pedal-zone {
-            width: 50%;
+            width: 40%;
             pointer-events: none;
             display: flex;
             flex-direction: row;
             justify-content: flex-end;
             align-items: flex-end;
             gap: 15px;
-        }
-
-        /* VERTICAL COLUMN FOR BRAKE & JUMP */
-        .brake-jump-col {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            align-items: center;
-            justify-content: flex-end;
-            pointer-events: none;
         }
 
         .control-btn {
@@ -227,34 +225,15 @@
             color: black;
         }
 
-        #btn-gas {
-            width: clamp(70px, 15vw, 90px);
-            height: clamp(140px, 28vw, 180px);
-            border-radius: 20px 20px 10px 10px;
-            font-size: 14px;
-            writing-mode: vertical-rl;
-            text-orientation: upright;
-            background: rgba(0, 255, 0, 0.2);
-            border-color: #00ff00;
-        }
-        #btn-gas:active { background: rgba(0, 255, 0, 0.6); }
-
-        #btn-brake {
-            width: clamp(80px, 18vw, 100px);
-            height: clamp(60px, 12vw, 80px);
-            border-radius: 12px;
-            font-size: 14px;
-            background: rgba(255, 255, 255, 0.15);
-        }
-        #btn-brake:active { background: rgba(255, 255, 255, 0.6); }
-
         #btn-jump {
-            width: clamp(80px, 18vw, 100px);
-            height: clamp(60px, 12vw, 80px);
-            border-radius: 12px;
-            font-size: 14px;
+            width: clamp(80px, 20vw, 110px);
+            height: clamp(80px, 20vw, 110px);
+            border-radius: 50%; 
+            font-size: clamp(14px, 4vw, 18px);
             background: rgba(255, 50, 50, 0.3);
             border-color: #ff3333;
+            margin-bottom: 10px;
+            margin-right: 10px;
         }
         #btn-jump:active { background: rgba(255, 50, 50, 0.7); }
 
@@ -284,10 +263,10 @@
     <div class="hud-stats">
         <div id="speed">0 KM/H</div>
         <div id="fps">60 FPS</div>
+        <!-- Buttons Group -->
+        <div id="camera-indicator" class="hud-btn">CAM: FAR CHASE</div>
+        <div id="music-indicator" class="hud-btn active">MUSIC: ON</div>
     </div>
-    
-    <!-- CAMERA BUTTON -->
-    <div id="camera-indicator">CAM: FAR CHASE</div>
 
     <!-- CONTROLS -->
     <div class="touch-controls">
@@ -298,11 +277,7 @@
             </div>
         </div>
         <div id="pedal-zone">
-            <div class="brake-jump-col">
-                <div class="control-btn" id="btn-jump">JUMP</div>
-                <div class="control-btn" id="btn-brake">BRAKE</div>
-            </div>
-            <div class="control-btn" id="btn-gas">GAS</div>
+            <div class="control-btn" id="btn-jump">JUMP</div>
         </div>
     </div>
 
@@ -340,12 +315,11 @@
         const FRICTION = 0.98;
         const TURN_SPEED = 0.04;
         const GRAVITY = 0.025; 
-        const JUMP_FORCE = 0.22; // Reduced to ~40%
+        const JUMP_FORCE = 0.22; 
         const MAP_LIMIT = 195; 
         
         const keys = { w: false, a: false, s: false, d: false, space: false };
         
-        // CAMERA MODES: 0=Chase, 1=Far, 2=Hood, 3=Top
         let activeCameraMode = 0; 
         let analogSteering = 0;
         let analogThrottle = 0; 
@@ -360,7 +334,8 @@
                 zone.addEventListener('touchstart', (e) => {
                     e.preventDefault(); const touch = e.changedTouches[0]; this.active = true;
                     const rect = zone.getBoundingClientRect(); this.origin.x = touch.clientX - rect.left; this.origin.y = touch.clientY - rect.top;
-                    base.style.display = 'block'; base.style.left = this.origin.x + 'px'; base.style.top = this.origin.y + 'px'; knob.style.transform = `translate(-50%, -50%)`; sfx.init();
+                    base.style.display = 'block'; base.style.left = this.origin.x + 'px'; base.style.top = this.origin.y + 'px'; knob.style.transform = `translate(-50%, -50%)`; 
+                    sfx.init(); sfx.playMusic(); // Init audio
                 }, { passive: false });
                 zone.addEventListener('touchmove', (e) => {
                     if (!this.active) return; e.preventDefault(); const touch = e.changedTouches[0]; const rect = zone.getBoundingClientRect();
@@ -377,28 +352,82 @@
         };
 
         const sfx = {
-            ctx: null, engineOsc: null, engineGain: null, filter: null, noiseBuffer: null,
+            ctx: null, engineOsc: null, engineGain: null, filter: null, noiseBuffer: null, skidOsc: null, skidGain: null, 
+            bgm: null, bgmGain: null, isMusicOn: true,
+            
             init: function() {
-                if (this.ctx) return;
+                if (this.ctx) {
+                    if (this.ctx.state === 'suspended') this.ctx.resume();
+                    return;
+                }
                 const AC = window.AudioContext || window.webkitAudioContext;
                 this.ctx = new AC();
+                
+                // --- SFX Setup ---
                 const bufferSize = this.ctx.sampleRate * 2; 
                 this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
                 const data = this.noiseBuffer.getChannelData(0);
                 for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
-                this.engineOsc = this.ctx.createOscillator(); this.engineOsc.type = 'sawtooth'; this.engineOsc.frequency.value = 60;
+                
+                this.engineOsc = this.ctx.createOscillator(); this.engineOsc.type = 'triangle'; this.engineOsc.frequency.value = 60;
                 this.engineGain = this.ctx.createGain(); this.engineGain.gain.value = 0;
                 this.filter = this.ctx.createBiquadFilter(); this.filter.type = 'lowpass'; this.filter.frequency.value = 400;
                 this.engineOsc.connect(this.filter); this.filter.connect(this.engineGain); this.engineGain.connect(this.ctx.destination);
                 this.engineOsc.start();
+
+                this.skidOsc = this.ctx.createOscillator();
+                this.skidOsc.type = 'sawtooth';
+                this.skidOsc.frequency.value = 150;
+                this.skidGain = this.ctx.createGain();
+                this.skidGain.gain.value = 0;
+                this.skidOsc.connect(this.skidGain);
+                this.skidGain.connect(this.ctx.destination);
+                this.skidOsc.start();
+
+                // --- Music Setup ---
+                this.bgm = new Audio('music/cybertruck.mp3');
+                this.bgm.loop = true;
+                this.bgm.volume = 0.6; // Slightly lower than max
+                
+                // Try playing if configured
+                if(this.isMusicOn) this.playMusic();
             },
-            updateEngine: function(speedPercent) {
+            
+            playMusic: function() {
+                if (this.bgm && this.isMusicOn && this.bgm.paused) {
+                    this.bgm.play().catch(e => console.log("Audio play failed, waiting for interaction"));
+                }
+            },
+
+            toggleMusic: function() {
+                this.isMusicOn = !this.isMusicOn;
+                if(this.bgm) {
+                    if(this.isMusicOn) this.bgm.play();
+                    else this.bgm.pause();
+                }
+                const btn = document.getElementById('music-indicator');
+                if(this.isMusicOn) {
+                    btn.innerText = "MUSIC: ON";
+                    btn.classList.add('active');
+                } else {
+                    btn.innerText = "MUSIC: OFF";
+                    btn.classList.remove('active');
+                }
+            },
+
+            updateEngine: function(speedPercent, isSkidding) {
                 if (!this.ctx) return;
                 this.engineOsc.frequency.setTargetAtTime(60 + (speedPercent * 300), this.ctx.currentTime, 0.1);
-                // Reduced volume
-                const vol = (0.05 + (speedPercent * 0.1)) * 0.5; 
+                const vol = (0.05 + (speedPercent * 0.1)) * 0.3; 
                 this.engineGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.1);
                 this.filter.frequency.setTargetAtTime(200 + (speedPercent * 3000), this.ctx.currentTime, 0.1);
+
+                if(isSkidding) {
+                    this.skidGain.gain.setTargetAtTime(0.1, this.ctx.currentTime, 0.1);
+                    this.skidOsc.frequency.setTargetAtTime(200 + Math.random()*50, this.ctx.currentTime, 0.1);
+                } else {
+                    this.skidGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+                }
             },
             playLand: function(intensity) {
                 if (!this.ctx) return;
@@ -454,9 +483,15 @@
             loadModels();
 
             window.addEventListener('resize', onWindowResize);
-            document.addEventListener('keydown', (e) => { onKey(e, true); sfx.init(); });
+            document.addEventListener('keydown', (e) => { onKey(e, true); sfx.init(); sfx.playMusic(); });
             document.addEventListener('keyup', (e) => onKey(e, false));
-            const camInd = document.getElementById('camera-indicator'); camInd.addEventListener('click', (e) => { e.stopPropagation(); switchCamera(); });
+            
+            const camInd = document.getElementById('camera-indicator'); 
+            camInd.addEventListener('click', (e) => { e.stopPropagation(); switchCamera(); });
+            
+            const musInd = document.getElementById('music-indicator');
+            musInd.addEventListener('click', (e) => { e.stopPropagation(); sfx.toggleMusic(); });
+
             setupTouchControls();
             animate();
         }
@@ -475,13 +510,10 @@
         }
 
         function createRings() {
-            const geo = new THREE.TorusGeometry(1.5, 0.2, 8, 16);
+            // Smaller & Yellow (0.8 rad, fixed height)
+            const geo = new THREE.TorusGeometry(0.8, 0.15, 8, 16);
             const mat = new THREE.MeshStandardMaterial({ 
-                color: 0xFFD700, 
-                metalness: 1.0, 
-                roughness: 0.2,
-                emissive: 0xaa8800,
-                emissiveIntensity: 0.5
+                color: 0xFFFF00, metalness: 0.1, roughness: 0.2, emissive: 0xFFFF00, emissiveIntensity: 0.8
             });
 
             for(let i=0; i<20; i++) {
@@ -490,13 +522,10 @@
                 const z = (Math.random() - 0.5) * 300;
                 const y = getTerrainHeight(x, z);
                 
-                // Random height: Floor or Air
-                const yOffset = Math.random() > 0.5 ? 0.5 : 3.0;
-                
-                ring.position.set(x, y + yOffset, z); 
+                // FIXED HEIGHT 0.2 above floor
+                ring.position.set(x, y + 0.2, z); 
                 ring.rotation.y = Math.random() * Math.PI;
                 ring.castShadow = true;
-                
                 scene.add(ring);
                 rings.push(ring);
             }
@@ -595,11 +624,11 @@
             joystick.init();
             const bindBtn = (id, key) => {
                 const btn = document.getElementById(id);
-                const start = (e) => { e.preventDefault(); keys[key] = true; btn.classList.add('active'); sfx.init(); if(window.navigator.vibrate) window.navigator.vibrate(10); };
+                const start = (e) => { e.preventDefault(); keys[key] = true; btn.classList.add('active'); sfx.init(); sfx.playMusic(); if(window.navigator.vibrate) window.navigator.vibrate(10); };
                 const end = (e) => { e.preventDefault(); keys[key] = false; btn.classList.remove('active'); };
                 btn.addEventListener('touchstart', start, { passive: false }); btn.addEventListener('touchend', end, { passive: false });
             };
-            bindBtn('btn-gas', 'w'); bindBtn('btn-brake', 's'); bindBtn('btn-jump', 'space');
+            bindBtn('btn-jump', 'space');
         }
 
         function createTerrain() {
@@ -641,8 +670,6 @@
         function switchCamera() { 
             activeCameraMode = (activeCameraMode + 1) % 4; // Cycle 0 -> 1 -> 2 -> 3 -> 0
             const ind = document.getElementById('camera-indicator'); 
-            
-            // Text shows NEXT available mode
             let nextMode = (activeCameraMode + 1) % 4;
             let label = "";
             switch(nextMode) {
@@ -719,19 +746,38 @@
             let turnInput = 0; if (keys.a) turnInput += 1; if (keys.d) turnInput -= 1; turnInput += analogSteering; 
             if (bikeGroup && Math.abs(speed) > 0.05) bikeGroup.rotation.y += turnInput * TURN_SPEED;
 
+            // DRIFT LOGIC
+            let isDrifting = false;
+            if (Math.abs(speed) > 0.6 && Math.abs(turnInput) > 0.5) isDrifting = true;
+
             if (bikeGroup) {
-                const nextVel = new THREE.Vector3(0, 0, speed); nextVel.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                const nextX = bikeGroup.position.x + nextVel.x; const nextZ = bikeGroup.position.z + nextVel.z;
+                const nextVel = new THREE.Vector3(0, 0, speed); 
+                nextVel.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
+                const nextX = bikeGroup.position.x + nextVel.x; 
+                const nextZ = bikeGroup.position.z + nextVel.z;
+
+                // Drift: Side Slip
+                if(isDrifting) {
+                    const slideAmt = speed * turnInput * 0.05;
+                    const slideVec = new THREE.Vector3(slideAmt, 0, 0);
+                    slideVec.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
+                    bikeGroup.translateX(-slideAmt); 
+                    if(frameCount % 5 === 0) createDust();
+                }
 
                 if (checkCollisions(nextX, nextZ)) { speed = -speed * 0.5; sfx.playLand(1.0); } 
-                else { velocity.set(0, 0, speed); velocity.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y); bikeGroup.position.add(velocity); }
+                else { 
+                    velocity.set(0, 0, speed); 
+                    velocity.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y); 
+                    bikeGroup.position.add(velocity); 
+                }
 
                 if (bikeGroup.position.x > MAP_LIMIT) { bikeGroup.position.x = MAP_LIMIT; speed = 0; }
                 if (bikeGroup.position.x < -MAP_LIMIT) { bikeGroup.position.x = -MAP_LIMIT; speed = 0; }
                 if (bikeGroup.position.z > MAP_LIMIT) { bikeGroup.position.z = MAP_LIMIT; speed = 0; }
                 if (bikeGroup.position.z < -MAP_LIMIT) { bikeGroup.position.z = -MAP_LIMIT; speed = 0; }
 
-                sfx.updateEngine(Math.abs(speed));
+                sfx.updateEngine(Math.abs(speed), isDrifting);
                 checkRings();
                 updateBattery();
 
@@ -746,38 +792,13 @@
                 const targetRoll = turnInput * 0.3; bikeGroup.rotation.z = THREE.MathUtils.lerp(bikeGroup.rotation.z, targetRoll, 0.1);
 
                 const targetPos = bikeGroup.position.clone();
-                let camOffset = new THREE.Vector3();
-                let lookOffset = new THREE.Vector3(0, 1, 0);
-
-                // --- MULTI CAM LOGIC ---
-                switch(activeCameraMode) {
-                    case 0: // Chase Standard
-                        camOffset.set(0, 3, -6);
-                        break;
-                    case 1: // Far Chase
-                        camOffset.set(0, 6, -12);
-                        break;
-                    case 2: // Hood / FPV
-                        camOffset.set(0, 1.2, 0.5);
-                        lookOffset.set(0, 1.2, 5); // Look further ahead
-                        break;
-                    case 3: // Top Down
-                        camera.position.set(targetPos.x, targetPos.y + 25, targetPos.z + 5);
-                        camera.lookAt(targetPos);
-                        break;
-                }
-
-                if (activeCameraMode !== 3) {
-                    camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                    const camPos = targetPos.clone().add(camOffset);
-                    const camGroundH = getTerrainHeight(camPos.x, camPos.z);
-                    if (camPos.y < camGroundH + 1.0) camPos.y = camGroundH + 1.0;
-                    camera.position.lerp(camPos, 0.1);
-                    camera.lookAt(targetPos.clone().add(lookOffset));
-                }
+                if (activeCameraMode === 1) {
+                    const offset = new THREE.Vector3(0, 3, -6); offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
+                    const camPos = targetPos.clone().add(offset); const camGroundH = getTerrainHeight(camPos.x, camPos.z); if (camPos.y < camGroundH + 1.0) camPos.y = camGroundH + 1.0;
+                    camera.position.lerp(camPos, 0.1); camera.lookAt(targetPos.x, targetPos.y + 1, targetPos.z);
+                } else { camera.position.set(targetPos.x, targetPos.y + 25, targetPos.z + 5); camera.lookAt(targetPos); }
             }
 
-            // removed billboardTrees render call as it's undefined
             createDust(); updateParticles();
             document.getElementById('speed').innerText = Math.abs(Math.round(speed * 100)) + " KM/H";
             renderer.render(scene, camera);
