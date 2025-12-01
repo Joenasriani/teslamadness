@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Tesla Madness 1998 - Dynamic UI</title>
+    <title>Tesla Madness 1998 - Music Edition</title>
     
     <script type="importmap">
     {
@@ -92,12 +92,14 @@
             pointer-events: none;
             font-size: clamp(12px, 3.5vw, 16px);
             max-width: 40%;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
         }
 
-        #camera-indicator {
-            position: absolute;
-            top: max(70px, calc(env(safe-area-inset-top) + 50px)); 
-            right: max(20px, env(safe-area-inset-right));
+        /* HUD BUTTONS (Camera & Music) */
+        .hud-btn {
             background: rgba(0, 0, 0, 0.5);
             border: 2px solid #ffcc00;
             padding: 5px 8px;
@@ -107,9 +109,19 @@
             font-size: clamp(9px, 2.5vw, 12px);
             pointer-events: auto; 
             cursor: pointer;
-            z-index: 20;
             border-radius: 4px;
             white-space: nowrap;
+            text-shadow: 1px 1px 0 #000;
+            transition: background 0.1s;
+        }
+        
+        .hud-btn:active {
+            background: rgba(255, 204, 0, 0.3);
+        }
+
+        .hud-btn.off {
+            border-color: #555;
+            color: #888;
         }
 
         /* LOADING SCREEN */
@@ -159,7 +171,6 @@
             pointer-events: auto;
             touch-action: none;
             position: relative;
-            /* border: 1px solid rgba(255,255,255,0.1); Debugging border */
         }
 
         /* TEXT HINTS */
@@ -187,22 +198,32 @@
             pointer-events: none;
         }
         
-        /* The inner circle (Knob or Jump button) */
         .touch-feedback-knob {
             position: absolute;
             width: 50px; height: 50px;
-            background: rgba(255, 204, 0, 0.8); /* Yellow Theme */
+            background: rgba(255, 204, 0, 0.8);
             border-radius: 50%;
             transform: translate(-50%, -50%);
             left: 50%; top: 50%;
             box-shadow: 0 0 15px rgba(255, 204, 0, 0.6);
         }
 
-        /* Specialize Jump feedback slightly */
-        #jump-visual .touch-feedback-knob {
-            width: 80px; height: 80px; /* Larger hit area visual */
-            background: rgba(255, 204, 0, 0.6);
-            border: 2px solid #ffcc00;
+        /* RED BRAKE BUTTON VISUAL */
+        #brake-visual .touch-feedback-knob {
+            width: 90px; height: 90px;
+            background: rgba(255, 50, 50, 0.6);
+            border: 2px solid #ff3333;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        #brake-visual .touch-feedback-knob::after {
+            content: "BRAKE";
         }
 
     </style>
@@ -231,10 +252,11 @@
     <div class="hud-stats">
         <div id="speed">0 KM/H</div>
         <div id="fps">60 FPS</div>
+        
+        <!-- BUTTONS -->
+        <div id="camera-indicator" class="hud-btn">CAM: FAR CHASE</div>
+        <div id="music-indicator" class="hud-btn">MUSIC: ON</div>
     </div>
-    
-    <!-- CAMERA BUTTON -->
-    <div id="camera-indicator">CAM: FAR CHASE</div>
 
     <!-- CONTROLS -->
     <div class="touch-controls">
@@ -246,10 +268,10 @@
             </div>
         </div>
         
-        <!-- RIGHT: DYNAMIC JUMP -->
-        <div id="jump-zone" class="control-zone">
-            <div class="zone-hint hint-right">TAP TO JUMP</div>
-            <div class="touch-feedback-base" id="jump-visual">
+        <!-- RIGHT: BRAKE/DRIFT -->
+        <div id="brake-zone" class="control-zone">
+            <div class="zone-hint hint-right">HOLD TO DRIFT</div>
+            <div class="touch-feedback-base" id="brake-visual">
                 <div class="touch-feedback-knob"></div>
             </div>
         </div>
@@ -287,12 +309,12 @@
         const MAX_SPEED = 1.2;
         const ACCEL = 0.02;
         const FRICTION = 0.98;
+        const BRAKE_FRICTION = 0.92; 
         const TURN_SPEED = 0.04;
-        const GRAVITY = 0.025; 
-        const JUMP_FORCE = 0.22; 
+        const GRAVITY = 0.04; 
         const MAP_LIMIT = 195; 
         
-        const keys = { w: false, a: false, s: false, d: false, space: false };
+        const keys = { w: false, a: false, s: false, d: false, space: false, brake: false };
         
         let activeCameraMode = 0; 
         let analogSteering = 0;
@@ -301,7 +323,6 @@
         // --- CONTROLS LOGIC ---
         const controls = {
             init: function() {
-                // JOYSTICK (LEFT)
                 const joyZone = document.getElementById('joystick-zone');
                 const joyVisual = document.getElementById('joy-visual');
                 const joyKnob = document.getElementById('joy-knob');
@@ -322,7 +343,7 @@
                     joyVisual.style.left = joyOrigin.x + 'px';
                     joyVisual.style.top = joyOrigin.y + 'px';
                     joyKnob.style.transform = `translate(-50%, -50%)`;
-                    sfx.init();
+                    sfx.init(); sfx.playMusic(); // Start music on touch
                 }, { passive: false });
 
                 joyZone.addEventListener('touchmove', (e) => {
@@ -355,41 +376,45 @@
                 joyZone.addEventListener('touchend', endJoy);
                 joyZone.addEventListener('touchcancel', endJoy);
 
-                // DYNAMIC JUMP (RIGHT)
-                const jumpZone = document.getElementById('jump-zone');
-                const jumpVisual = document.getElementById('jump-visual');
+                // DYNAMIC BRAKE (RIGHT)
+                const brakeZone = document.getElementById('brake-zone');
+                const brakeVisual = document.getElementById('brake-visual');
 
-                jumpZone.addEventListener('touchstart', (e) => {
+                brakeZone.addEventListener('touchstart', (e) => {
                     e.preventDefault();
                     const touch = e.changedTouches[0];
-                    keys.space = true;
-                    sfx.init();
+                    keys.brake = true;
+                    sfx.init(); sfx.playMusic(); // Start music on touch
                     if(window.navigator.vibrate) window.navigator.vibrate(10);
 
-                    // Show visual feedback at touch point
-                    const rect = jumpZone.getBoundingClientRect();
+                    const rect = brakeZone.getBoundingClientRect();
                     const x = touch.clientX - rect.left;
                     const y = touch.clientY - rect.top;
                     
-                    jumpVisual.style.display = 'block';
-                    jumpVisual.style.left = x + 'px';
-                    jumpVisual.style.top = y + 'px';
+                    brakeVisual.style.display = 'block';
+                    brakeVisual.style.left = x + 'px';
+                    brakeVisual.style.top = y + 'px';
                 }, { passive: false });
 
-                const endJump = (e) => {
+                const endBrake = (e) => {
                     e.preventDefault();
-                    keys.space = false;
-                    jumpVisual.style.display = 'none';
+                    keys.brake = false;
+                    brakeVisual.style.display = 'none';
                 };
-                jumpZone.addEventListener('touchend', endJump);
-                jumpZone.addEventListener('touchcancel', endJump);
+                brakeZone.addEventListener('touchend', endBrake);
+                brakeZone.addEventListener('touchcancel', endBrake);
             }
         };
 
         const sfx = {
             ctx: null, engineOsc: null, engineGain: null, filter: null, noiseBuffer: null, skidOsc: null, skidGain: null,
+            bgm: null, isMusicOn: true,
+            
             init: function() {
-                if (this.ctx) return;
+                if (this.ctx) {
+                    if (this.ctx.state === 'suspended') this.ctx.resume();
+                    return;
+                }
                 const AC = window.AudioContext || window.webkitAudioContext;
                 this.ctx = new AC();
                 const bufferSize = this.ctx.sampleRate * 2; 
@@ -411,7 +436,34 @@
                 this.skidOsc.connect(this.skidGain);
                 this.skidGain.connect(this.ctx.destination);
                 this.skidOsc.start();
+
+                // MUSIC SETUP
+                this.bgm = new Audio('music/cybertruck.mp3');
+                this.bgm.loop = true;
+                this.bgm.volume = 0.6;
             },
+            
+            playMusic: function() {
+                if (this.bgm && this.isMusicOn && this.bgm.paused) {
+                    this.bgm.play().catch(e => { /* Autoplay blocked */ });
+                }
+            },
+
+            toggleMusic: function() {
+                this.isMusicOn = !this.isMusicOn;
+                const btn = document.getElementById('music-indicator');
+                
+                if (this.isMusicOn) {
+                    if(this.bgm) this.bgm.play();
+                    btn.innerText = "MUSIC: ON";
+                    btn.classList.remove('off');
+                } else {
+                    if(this.bgm) this.bgm.pause();
+                    btn.innerText = "MUSIC: OFF";
+                    btn.classList.add('off');
+                }
+            },
+
             updateEngine: function(speedPercent, isSkidding) {
                 if (!this.ctx) return;
                 this.engineOsc.frequency.setTargetAtTime(60 + (speedPercent * 300), this.ctx.currentTime, 0.1);
@@ -420,8 +472,8 @@
                 this.filter.frequency.setTargetAtTime(200 + (speedPercent * 3000), this.ctx.currentTime, 0.1);
 
                 if(isSkidding) {
-                    this.skidGain.gain.setTargetAtTime(0.1, this.ctx.currentTime, 0.1);
-                    this.skidOsc.frequency.setTargetAtTime(200 + Math.random()*50, this.ctx.currentTime, 0.1);
+                    this.skidGain.gain.setTargetAtTime(0.15, this.ctx.currentTime, 0.1);
+                    this.skidOsc.frequency.setTargetAtTime(150 + Math.random()*100, this.ctx.currentTime, 0.1);
                 } else {
                     this.skidGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
                 }
@@ -435,16 +487,6 @@
                 filter.frequency.setValueAtTime(600, this.ctx.currentTime); filter.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.2);
                 src.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
                 src.start(); src.stop(this.ctx.currentTime + 0.3);
-            },
-            playJump: function() {
-                 if (!this.ctx) return;
-                const src = this.ctx.createBufferSource(); src.buffer = this.noiseBuffer;
-                const gain = this.ctx.createGain(); gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
-                gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.2);
-                const filter = this.ctx.createBiquadFilter(); filter.type = 'highpass';
-                filter.frequency.setValueAtTime(400, this.ctx.currentTime); filter.frequency.linearRampToValueAtTime(1000, this.ctx.currentTime + 0.2);
-                src.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
-                src.start();
             },
             playCollect: function() {
                 if (!this.ctx) return;
@@ -480,12 +522,16 @@
             loadModels();
 
             window.addEventListener('resize', onWindowResize);
-            document.addEventListener('keydown', (e) => { onKey(e, true); sfx.init(); });
+            document.addEventListener('keydown', (e) => { onKey(e, true); sfx.init(); sfx.playMusic(); });
             document.addEventListener('keyup', (e) => onKey(e, false));
-            const camInd = document.getElementById('camera-indicator'); camInd.addEventListener('click', (e) => { e.stopPropagation(); switchCamera(); });
             
-            controls.init(); // Init new touch controls
+            const camInd = document.getElementById('camera-indicator'); 
+            camInd.addEventListener('click', (e) => { e.stopPropagation(); switchCamera(); });
             
+            const musInd = document.getElementById('music-indicator');
+            musInd.addEventListener('click', (e) => { e.stopPropagation(); sfx.toggleMusic(); });
+
+            controls.init(); 
             animate();
         }
 
@@ -503,7 +549,6 @@
         }
 
         function createRings() {
-            // Smaller & Yellow (0.8 rad, fixed height)
             const geo = new THREE.TorusGeometry(0.8, 0.15, 8, 16);
             const mat = new THREE.MeshStandardMaterial({ 
                 color: 0xFFFF00, metalness: 0.1, roughness: 0.2, emissive: 0xFFFF00, emissiveIntensity: 0.8
@@ -514,8 +559,6 @@
                 const x = (Math.random() - 0.5) * 300;
                 const z = (Math.random() - 0.5) * 300;
                 const y = getTerrainHeight(x, z);
-                
-                // FIXED HEIGHT 0.2 above floor
                 ring.position.set(x, y + 0.2, z); 
                 ring.rotation.y = Math.random() * Math.PI;
                 ring.castShadow = true;
@@ -528,7 +571,6 @@
             const loader = new FBXLoader();
             bikeGroup = new THREE.Group(); scene.add(bikeGroup); 
 
-            // 1. Load Moto
             loader.load('fbx/moto.fbx', (object) => {
                 object.scale.set(0.005, 0.005, 0.005);
                 object.rotation.y = 0; 
@@ -540,7 +582,6 @@
             }, (xhr) => { if (xhr.lengthComputable) { progressMoto = (xhr.loaded / xhr.total) * 100; updateProgress(); } else { progressMoto = 50; updateProgress(); }
             }, (error) => { console.warn("Moto FBX missing."); reportError("moto.fbx"); createFallbackBike(); assetsLoaded++; checkLoading(); });
 
-            // 2. Load FBX Tree
             loader.load('fbx/Tree.fbx', (object) => {
                 const count = 40; 
                 const dummy = new THREE.Object3D();
@@ -611,7 +652,12 @@
             for(let i=0; i<30; i++) { const x = (Math.random() - 0.5) * 200; const z = (Math.random() - 0.5) * 200; const y = getTerrainHeight(x, z); const mesh = new THREE.Mesh(geo, mat); mesh.position.set(x, y+2, z); scene.add(mesh); obstacles.push({ x: x, z: z, radius: 1.5 }); }
         }
         function addExhaust() { const exhaustPoint = new THREE.Object3D(); exhaustPoint.position.set(0, 0.5, -1.2); exhaustPoint.name = "exhaust"; bikeGroup.add(exhaustPoint); }
-        function checkLoading() { if (assetsLoaded >= assetsTotal) { setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 500); } }
+        function checkLoading() { 
+            if (assetsLoaded >= assetsTotal) { 
+                sfx.init(); sfx.playMusic();
+                setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 500); 
+            } 
+        }
         
         function createTerrain() {
             const geometry = new THREE.PlaneGeometry(400, 400, 400, 400); geometry.rotateX(-Math.PI / 2); const positions = geometry.attributes.position.array;
@@ -650,15 +696,13 @@
         function onKey(e, pressed) { const k = e.key.toLowerCase(); if (k === 'w' || k === 'arrowup') keys.w = pressed; if (k === 's' || k === 'arrowdown') keys.s = pressed; if (k === 'a' || k === 'arrowleft') keys.a = pressed; if (k === 'd' || k === 'arrowright') keys.d = pressed; if (k === ' ') keys.space = pressed; }
         
         function switchCamera() { 
-            activeCameraMode = (activeCameraMode + 1) % 4; // Cycle 0 -> 1 -> 2 -> 3 -> 0
+            activeCameraMode = (activeCameraMode + 1) % 2; 
             const ind = document.getElementById('camera-indicator'); 
-            let nextMode = (activeCameraMode + 1) % 4;
+            let nextMode = (activeCameraMode + 1) % 2;
             let label = "";
             switch(nextMode) {
-                case 0: label = "CAM: CHASE"; break;
-                case 1: label = "CAM: FAR CHASE"; break;
-                case 2: label = "CAM: HOOD / FPV"; break;
-                case 3: label = "CAM: TOP DOWN"; break;
+                case 0: label = "CAM: ANGLED VIEW"; break;
+                case 1: label = "CAM: TOP VIEW"; break;
             }
             ind.innerText = label;
         }
@@ -671,39 +715,21 @@
             for(let i = rings.length - 1; i >= 0; i--) {
                 const ring = rings[i];
                 ring.rotation.y += 0.05; // Spin animation
-                
-                // Simple collision check
                 const dx = playerPos.x - ring.position.x;
-                const dy = (playerPos.y + 0.5) - ring.position.y; // Check height roughly
+                const dy = (playerPos.y + 0.5) - ring.position.y; 
                 const dz = playerPos.z - ring.position.z;
                 const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-
                 if (dist < 2.0) {
-                    // Collect!
-                    scene.remove(ring);
-                    rings.splice(i, 1);
-                    sfx.playCollect();
-                    battery = Math.min(100, battery + RING_CHARGE);
+                    scene.remove(ring); rings.splice(i, 1); sfx.playCollect(); battery = Math.min(100, battery + RING_CHARGE);
                 }
             }
         }
 
         function updateBattery() {
-            if (Math.abs(speed) > 0.01) {
-                battery -= BATTERY_DRAIN;
-                if (battery < 0) battery = 0;
-            }
-            
-            // UI Update
-            const bar = document.getElementById('battery-bar');
-            const txt = document.getElementById('battery-text');
-            bar.style.width = battery + "%";
-            txt.innerText = "BATTERY: " + Math.round(battery) + "%";
-            
-            // Speed Limit if Battery Low
-            if (battery <= 0) {
-                speed *= 0.95; // Slow to stop
-            }
+            if (Math.abs(speed) > 0.01) { battery -= BATTERY_DRAIN; if (battery < 0) battery = 0; }
+            const bar = document.getElementById('battery-bar'); const txt = document.getElementById('battery-text');
+            bar.style.width = battery + "%"; txt.innerText = "BATTERY: " + Math.round(battery) + "%";
+            if (battery <= 0) speed *= 0.95; 
         }
 
         function animate(time) {
@@ -711,26 +737,30 @@
             if (time - lastTime >= 1000) { document.getElementById('fps').innerText = frameCount + " FPS"; frameCount = 0; lastTime = time; }
             frameCount++;
 
-            // Acceleration (Only works if battery > 0)
             let throttleInput = 0;
             if (keys.w) throttleInput += 1;
             if (keys.s) throttleInput -= 1;
-            // Add joystick throttle
             if (Math.abs(analogThrottle) > 0.1) throttleInput += analogThrottle;
 
-            if (battery > 0) {
-                if (throttleInput > 0) speed += ACCEL * throttleInput;
-            }
-            if (throttleInput < 0) speed += ACCEL * throttleInput; // Brake/Reverse works even without battery
+            if (battery > 0) { if (throttleInput > 0) speed += ACCEL * throttleInput; }
+            if (throttleInput < 0) speed += ACCEL * throttleInput; 
             
-            speed *= FRICTION;
+            // BRAKE LOGIC
+            if (keys.brake) {
+                speed *= BRAKE_FRICTION; // Strong slow down
+            } else {
+                speed *= FRICTION; // Normal friction
+            }
             
             let turnInput = 0; if (keys.a) turnInput += 1; if (keys.d) turnInput -= 1; turnInput += analogSteering; 
             if (bikeGroup && Math.abs(speed) > 0.05) bikeGroup.rotation.y += turnInput * TURN_SPEED;
 
             // DRIFT LOGIC
             let isDrifting = false;
-            if (Math.abs(speed) > 0.6 && Math.abs(turnInput) > 0.5) isDrifting = true;
+            // Only drift if moving fast, turning, AND HOLDING BRAKE
+            if (Math.abs(speed) > 0.4 && Math.abs(turnInput) > 0.5 && keys.brake) {
+                isDrifting = true;
+            }
 
             if (bikeGroup) {
                 const nextVel = new THREE.Vector3(0, 0, speed); 
@@ -738,17 +768,17 @@
                 const nextX = bikeGroup.position.x + nextVel.x; 
                 const nextZ = bikeGroup.position.z + nextVel.z;
 
-                // Drift: Side Slip
                 if(isDrifting) {
-                    const slideAmt = speed * turnInput * 0.05;
-                    const slideVec = new THREE.Vector3(slideAmt, 0, 0);
-                    slideVec.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                    bikeGroup.translateX(-slideAmt); 
-                    if(frameCount % 5 === 0) createDust();
+                    const slideAmt = speed * turnInput * 0.08; // Stronger drift
+                    // Apply visual drift rotation
+                    bikeGroup.rotation.y += turnInput * 0.05; // Oversteer
+                    bikeGroup.translateX(-slideAmt); // Slide outwards
+                    if(frameCount % 3 === 0) createDust(); // More dust
                 }
 
-                if (checkCollisions(nextX, nextZ)) { speed = -speed * 0.5; sfx.playLand(1.0); } 
-                else { 
+                if (checkCollisions(nextX, nextZ)) { 
+                    speed = -speed * 0.5; sfx.playLand(1.0); 
+                } else { 
                     velocity.set(0, 0, speed); 
                     velocity.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y); 
                     bikeGroup.position.add(velocity); 
@@ -764,21 +794,54 @@
                 updateBattery();
 
                 const groundH = getTerrainHeight(bikeGroup.position.x, bikeGroup.position.z);
-                verticalVelocity -= GRAVITY; bikeGroup.position.y += verticalVelocity;
-                if (bikeGroup.position.y > groundH + 0.2) isAirborne = true;
-                if (bikeGroup.position.y < groundH) { bikeGroup.position.y = groundH; if (isAirborne) { sfx.playLand(Math.abs(verticalVelocity) * 2); isAirborne = false; } verticalVelocity = 0; if (keys.space && battery > 0) { verticalVelocity = JUMP_FORCE; sfx.playJump(); isAirborne = true; } }
+                verticalVelocity -= GRAVITY; 
+                bikeGroup.position.y += verticalVelocity;
+
+                // REINFORCED GROUND CLAMP
+                if (bikeGroup.position.y < groundH) { 
+                    bikeGroup.position.y = groundH; 
+                    if (isAirborne) { sfx.playLand(Math.abs(verticalVelocity) * 2); isAirborne = false; } 
+                    verticalVelocity = 0; 
+                }
+                
+                // Force check
+                if (bikeGroup.position.y < groundH) {
+                    bikeGroup.position.y = groundH;
+                }
 
                 const aheadV = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                const nextXPos = bikeGroup.position.x + aheadV.x; const nextZPos = bikeGroup.position.z + aheadV.z; const nextH = getTerrainHeight(nextXPos, nextZPos);
-                const angle = Math.atan2(nextH - groundH, 1.0); bikeGroup.rotation.x = THREE.MathUtils.lerp(bikeGroup.rotation.x, -angle, 0.1);
-                const targetRoll = turnInput * 0.3; bikeGroup.rotation.z = THREE.MathUtils.lerp(bikeGroup.rotation.z, targetRoll, 0.1);
+                const nextXPos = bikeGroup.position.x + aheadV.x; 
+                const nextZPos = bikeGroup.position.z + aheadV.z; 
+                const nextH = getTerrainHeight(nextXPos, nextZPos);
+                
+                const angle = Math.atan2(nextH - groundH, 1.0); 
+                bikeGroup.rotation.x = THREE.MathUtils.lerp(bikeGroup.rotation.x, -angle, 0.2);
+                
+                const targetRoll = turnInput * 0.3; 
+                bikeGroup.rotation.z = THREE.MathUtils.lerp(bikeGroup.rotation.z, targetRoll, 0.1);
 
                 const targetPos = bikeGroup.position.clone();
-                if (activeCameraMode === 1) {
-                    const offset = new THREE.Vector3(0, 3, -6); offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                    const camPos = targetPos.clone().add(offset); const camGroundH = getTerrainHeight(camPos.x, camPos.z); if (camPos.y < camGroundH + 1.0) camPos.y = camGroundH + 1.0;
-                    camera.position.lerp(camPos, 0.1); camera.lookAt(targetPos.x, targetPos.y + 1, targetPos.z);
-                } else { camera.position.set(targetPos.x, targetPos.y + 25, targetPos.z + 5); camera.lookAt(targetPos); }
+                let camOffset = new THREE.Vector3();
+                let lookOffset = new THREE.Vector3(0, 1, 0);
+
+                // --- 2 CAMERA MODES LOGIC ---
+                switch(activeCameraMode) {
+                    case 0: // Chase Standard
+                        camOffset.set(0, 4, -8);
+                        camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
+                        break;
+                    case 1: // Top Down (Relative)
+                        camOffset.set(0, 25, -2);
+                        camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
+                        break;
+                }
+
+                const camPos = targetPos.clone().add(camOffset);
+                const camGroundH = getTerrainHeight(camPos.x, camPos.z);
+                if (camPos.y < camGroundH + 1.0) camPos.y = camGroundH + 1.0;
+
+                camera.position.lerp(camPos, 0.1);
+                camera.lookAt(targetPos.clone().add(lookOffset));
             }
 
             createDust(); updateParticles();
