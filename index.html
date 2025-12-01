@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Tesla Madness 1998 - SFX Control</title>
+    <title>Tesla Madness 1998 - Real Drift</title>
     
     <script type="importmap">
     {
@@ -26,7 +26,6 @@
         }
         #canvas-container { width: 100vw; height: 100vh; display: block; }
         
-        /* LEFT HEADER UI */
         #ui-layer {
             position: absolute;
             top: max(20px, env(safe-area-inset-top)); 
@@ -42,21 +41,10 @@
             gap: 2px;
         }
         
-        h1 { 
-            margin: 0; 
-            font-size: clamp(14px, 4vw, 24px); 
-            letter-spacing: 1px; 
-            text-transform: uppercase; 
-            font-weight: bold; 
-            white-space: nowrap; 
-            line-height: 1.2;
-        }
+        h1 { margin: 0; font-size: clamp(14px, 4vw, 24px); letter-spacing: 1px; text-transform: uppercase; font-weight: bold; white-space: nowrap; line-height: 1.2; }
         p { margin: 5px 0; font-size: clamp(9px, 2.5vw, 14px); color: #fff; }
         .accent { color: #00ff00; }
-        .blink { animation: blinker 1.5s linear infinite; color: #ff00ff; }
-        @keyframes blinker { 50% { opacity: 0; } }
-
-        /* BATTERY BAR */
+        
         .battery-container {
             margin-top: 25px; 
             width: 100%;
@@ -73,15 +61,9 @@
             transition: width 0.2s;
         }
         #battery-text {
-            position: absolute;
-            top: -18px; 
-            right: 0;
-            font-size: clamp(9px, 2.5vw, 12px);
-            color: #fff;
-            text-shadow: 1px 1px 0 #000;
+            position: absolute; top: -18px; right: 0; font-size: clamp(9px, 2.5vw, 12px); color: #fff; text-shadow: 1px 1px 0 #000;
         }
         
-        /* RIGHT HEADER UI */
         .hud-stats {
             position: absolute;
             top: max(20px, env(safe-area-inset-top));
@@ -98,7 +80,6 @@
             gap: 8px;
         }
 
-        /* HUD BUTTONS */
         .hud-btn {
             background: rgba(0, 0, 0, 0.5);
             border: 2px solid #ffcc00;
@@ -112,34 +93,14 @@
             border-radius: 4px;
             white-space: nowrap;
             text-shadow: 1px 1px 0 #000;
-            transition: background 0.1s, opacity 0.2s;
         }
         
-        .hud-btn:active { background: rgba(255, 204, 0, 0.3); }
-
-        .hud-btn.off {
-            border-color: #555;
-            color: #888;
-            opacity: 0.7;
-        }
-
-        /* LOADING SCREEN */
         #loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: clamp(280px, 60vw, 500px);
-            background: black;
-            padding: 20px;
-            border: 2px solid #ffcc00;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-            text-align: center;
-            box-shadow: 0 0 20px rgba(255, 204, 0, 0.2);
+            background: black; padding: 20px; border: 2px solid #ffcc00;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 100; text-align: center; box-shadow: 0 0 20px rgba(255, 204, 0, 0.2);
         }
         .loading-title { color: white; font-size: clamp(16px, 4vw, 20px); margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
         .progress-track { width: 100%; height: 20px; background: #222; border: 1px solid #555; margin-bottom: 10px; position: relative; }
@@ -147,84 +108,32 @@
         #loading-text { color: #aaa; font-size: 12px; }
         .error-msg { color: #ff3333 !important; }
 
-        /* --- MOBILE CONTROLS --- */
         .touch-controls {
-            position: absolute;
-            bottom: max(20px, env(safe-area-inset-bottom));
-            left: 0;
-            width: 100%;
-            height: auto;
-            pointer-events: none;
-            z-index: 50;
-            display: flex;
-            justify-content: space-between;
-            padding-left: max(20px, env(safe-area-inset-left));
-            padding-right: max(20px, env(safe-area-inset-right));
-            box-sizing: border-box;
-            align-items: flex-end;
+            position: absolute; bottom: max(20px, env(safe-area-inset-bottom)); left: 0; width: 100%; height: auto; pointer-events: none; z-index: 50;
+            display: flex; justify-content: space-between; padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)); box-sizing: border-box; align-items: flex-end;
         }
 
-        /* SHARED ZONE STYLES */
-        .control-zone {
-            width: 45%; height: 250px;
-            pointer-events: auto;
-            touch-action: none;
-            position: relative;
-        }
+        .control-zone { width: 45%; height: 250px; pointer-events: auto; touch-action: none; position: relative; }
+        .zone-hint { position: absolute; bottom: 20px; color: rgba(255,255,255,0.3); font-size: 12px; pointer-events: none; font-weight: bold; text-transform: uppercase; }
+        .hint-left { left: 0; } .hint-right { right: 0; text-align: right; }
 
-        /* TEXT HINTS */
-        .zone-hint {
-            position: absolute;
-            bottom: 20px;
-            color: rgba(255,255,255,0.3);
-            font-size: 12px;
-            pointer-events: none;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-        .hint-left { left: 0; }
-        .hint-right { right: 0; text-align: right; }
-
-        /* DYNAMIC VISUAL ELEMENTS */
         .touch-feedback-base {
-            position: absolute;
-            width: 100px; height: 100px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid rgba(255, 204, 0, 0.3);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            display: none;
-            pointer-events: none;
+            position: absolute; width: 100px; height: 100px; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 204, 0, 0.3); border-radius: 50%; transform: translate(-50%, -50%); display: none; pointer-events: none;
         }
-        
         .touch-feedback-knob {
-            position: absolute;
-            width: 50px; height: 50px;
-            background: rgba(255, 204, 0, 0.8);
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            left: 50%; top: 50%;
-            box-shadow: 0 0 15px rgba(255, 204, 0, 0.6);
+            position: absolute; width: 50px; height: 50px; background: rgba(255, 204, 0, 0.8); border-radius: 50%; transform: translate(-50%, -50%); left: 50%; top: 50%; box-shadow: 0 0 15px rgba(255, 204, 0, 0.6);
         }
 
-        /* RED BRAKE BUTTON VISUAL */
+        /* HANDBRAKE VISUAL */
         #brake-visual .touch-feedback-knob {
             width: 90px; height: 90px;
             background: rgba(255, 50, 50, 0.6);
             border: 2px solid #ff3333;
             box-shadow: 0 0 20px rgba(255, 0, 0, 0.4);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            font-size: 14px;
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: bold; font-size: 14px;
         }
-        
-        #brake-visual .touch-feedback-knob::after {
-            content: "BRAKE";
-        }
-
+        #brake-visual .touch-feedback-knob::after { content: "HANDBRAKE"; }
     </style>
 </head>
 <body>
@@ -237,7 +146,6 @@
         <div id="loading-text">LOADING ASSETS...</div>
     </div>
 
-    <!-- LEFT HEADER -->
     <div id="ui-layer">
         <h1>TESLA MADNESS '98</h1>
         <div class="battery-container">
@@ -247,28 +155,21 @@
         <p>COLLECT <span style="color:gold">GOLD RINGS</span></p>
     </div>
 
-    <!-- RIGHT HEADER -->
     <div class="hud-stats">
         <div id="speed">0 KM/H</div>
         <div id="fps">60 FPS</div>
-        
-        <!-- BUTTONS -->
         <div id="camera-indicator" class="hud-btn">CAM: FAR CHASE</div>
         <div id="music-indicator" class="hud-btn">MUSIC: ON</div>
         <div id="sfx-indicator" class="hud-btn">SFX: ON</div>
     </div>
 
-    <!-- CONTROLS -->
     <div class="touch-controls">
-        <!-- LEFT: JOYSTICK -->
         <div id="joystick-zone" class="control-zone">
             <div class="zone-hint hint-left">MOVE & STEER</div>
             <div class="touch-feedback-base" id="joy-visual">
                 <div class="touch-feedback-knob" id="joy-knob"></div>
             </div>
         </div>
-        
-        <!-- RIGHT: BRAKE/DRIFT -->
         <div id="brake-zone" class="control-zone">
             <div class="zone-hint hint-right">HOLD TO DRIFT</div>
             <div class="touch-feedback-base" id="brake-visual">
@@ -285,10 +186,14 @@
         import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
         let scene, camera, renderer;
-        let bikeGroup, terrainMesh;
+        let bikeGroup, bikeVisuals, terrainMesh;
+        
+        // PHYSICS VARIABLES
         let speed = 0;
-        let velocity = new THREE.Vector3();
+        let velocityVector = new THREE.Vector3(); // Actual movement direction
+        let facingVector = new THREE.Vector3(0, 0, 1); // Where the nose points
         let verticalVelocity = 0; 
+        
         let particles = [];
         let rings = []; 
         let frameCount = 0;
@@ -300,128 +205,72 @@
         
         let progressMoto = 0;
         let progressTree = 0;
-
-        // GAMEPLAY STATS
         let battery = 100;
+        
+        // TUNING
         const BATTERY_DRAIN = 0.05; 
         const RING_CHARGE = 20;
-
-        const MAX_SPEED = 1.2;
-        const ACCEL = 0.02;
-        const FRICTION = 0.98;
-        const BRAKE_FRICTION = 0.92; 
-        const TURN_SPEED = 0.04;
+        const MAX_SPEED = 1.4;
+        const ACCEL = 0.025;
+        const FRICTION = 0.98; // Ground friction
+        const DRIFT_FRICTION = 0.99; // Less friction when drifting (sliding)
+        const TURN_SPEED = 0.05;
         const GRAVITY = 0.04; 
         const MAP_LIMIT = 195; 
         
         const keys = { w: false, a: false, s: false, d: false, space: false, brake: false };
-        
         let activeCameraMode = 0; 
         let analogSteering = 0;
         let analogThrottle = 0; 
 
-        // --- CONTROLS LOGIC ---
-        const controls = {
+        // --- JOYSTICK ---
+        const joystick = {
+            active: false, origin: { x: 0, y: 0 }, maxDist: 50,
             init: function() {
-                // JOYSTICK (LEFT)
-                const joyZone = document.getElementById('joystick-zone');
-                const joyVisual = document.getElementById('joy-visual');
-                const joyKnob = document.getElementById('joy-knob');
+                const zone = document.getElementById('joystick-zone');
+                const visual = document.getElementById('joy-visual');
+                const knob = document.getElementById('joy-knob');
                 
-                let joyActive = false;
-                let joyOrigin = {x:0, y:0};
-                const maxDist = 50;
-
-                joyZone.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    const touch = e.changedTouches[0];
-                    joyActive = true;
-                    const rect = joyZone.getBoundingClientRect();
-                    joyOrigin.x = touch.clientX - rect.left;
-                    joyOrigin.y = touch.clientY - rect.top;
-                    
-                    joyVisual.style.display = 'block';
-                    joyVisual.style.left = joyOrigin.x + 'px';
-                    joyVisual.style.top = joyOrigin.y + 'px';
-                    joyKnob.style.transform = `translate(-50%, -50%)`;
+                zone.addEventListener('touchstart', (e) => {
+                    e.preventDefault(); const touch = e.changedTouches[0]; this.active = true;
+                    const rect = zone.getBoundingClientRect(); this.origin.x = touch.clientX - rect.left; this.origin.y = touch.clientY - rect.top;
+                    visual.style.display = 'block'; visual.style.left = this.origin.x + 'px'; visual.style.top = this.origin.y + 'px'; knob.style.transform = `translate(-50%, -50%)`;
                     sfx.init(); sfx.playMusic();
                 }, { passive: false });
 
-                joyZone.addEventListener('touchmove', (e) => {
-                    if (!joyActive) return;
-                    e.preventDefault();
-                    const touch = e.changedTouches[0];
-                    const rect = joyZone.getBoundingClientRect();
-                    
-                    let dx = (touch.clientX - rect.left) - joyOrigin.x;
-                    let dy = (touch.clientY - rect.top) - joyOrigin.y;
-                    
+                zone.addEventListener('touchmove', (e) => {
+                    if (!this.active) return; e.preventDefault(); const touch = e.changedTouches[0]; const rect = zone.getBoundingClientRect();
+                    let dx = (touch.clientX - rect.left) - this.origin.x; let dy = (touch.clientY - rect.top) - this.origin.y;
                     const dist = Math.sqrt(dx*dx + dy*dy);
-                    if (dist > maxDist) {
-                        const angle = Math.atan2(dy, dx);
-                        dx = Math.cos(angle) * maxDist;
-                        dy = Math.sin(angle) * maxDist;
-                    }
-
-                    joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-                    analogSteering = -(dx / maxDist);
-                    analogThrottle = -(dy / maxDist);
+                    if (dist > this.maxDist) { const angle = Math.atan2(dy, dx); dx = Math.cos(angle) * this.maxDist; dy = Math.sin(angle) * this.maxDist; }
+                    knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                    analogSteering = -(dx / this.maxDist); analogThrottle = -(dy / this.maxDist);
                 }, { passive: false });
 
-                const endJoy = () => {
-                    joyActive = false;
-                    joyVisual.style.display = 'none';
-                    analogSteering = 0;
-                    analogThrottle = 0;
-                };
-                joyZone.addEventListener('touchend', endJoy);
-                joyZone.addEventListener('touchcancel', endJoy);
+                const end = () => { this.active = false; visual.style.display = 'none'; analogSteering = 0; analogThrottle = 0; };
+                zone.addEventListener('touchend', end); zone.addEventListener('touchcancel', end);
 
-                // DYNAMIC BRAKE (RIGHT)
+                // HANDBRAKE UI
                 const brakeZone = document.getElementById('brake-zone');
                 const brakeVisual = document.getElementById('brake-visual');
-
                 brakeZone.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    const touch = e.changedTouches[0];
-                    keys.brake = true;
-                    sfx.init(); sfx.playMusic();
+                    e.preventDefault(); const touch = e.changedTouches[0]; keys.brake = true; sfx.init(); sfx.playMusic();
                     if(window.navigator.vibrate) window.navigator.vibrate(10);
-
                     const rect = brakeZone.getBoundingClientRect();
-                    const x = touch.clientX - rect.left;
-                    const y = touch.clientY - rect.top;
-                    
-                    brakeVisual.style.display = 'block';
-                    brakeVisual.style.left = x + 'px';
-                    brakeVisual.style.top = y + 'px';
+                    brakeVisual.style.display = 'block'; brakeVisual.style.left = (touch.clientX - rect.left) + 'px'; brakeVisual.style.top = (touch.clientY - rect.top) + 'px';
                 }, { passive: false });
-
-                const endBrake = (e) => {
-                    e.preventDefault();
-                    keys.brake = false;
-                    brakeVisual.style.display = 'none';
-                };
-                brakeZone.addEventListener('touchend', endBrake);
-                brakeZone.addEventListener('touchcancel', endBrake);
+                const endBrake = (e) => { e.preventDefault(); keys.brake = false; brakeVisual.style.display = 'none'; };
+                brakeZone.addEventListener('touchend', endBrake); brakeZone.addEventListener('touchcancel', endBrake);
             }
         };
 
         const sfx = {
-            ctx: null, engineOsc: null, engineGain: null, filter: null, noiseBuffer: null, skidOsc: null, skidGain: null, 
-            bgm: null, isMusicOn: true, isSfxOn: true,
-            
+            ctx: null, engineOsc: null, engineGain: null, filter: null, noiseBuffer: null, skidOsc: null, skidGain: null, bgm: null, isMusicOn: true, isSfxOn: true,
             init: function() {
-                if (this.ctx) {
-                    if (this.ctx.state === 'suspended') this.ctx.resume();
-                    return;
-                }
-                const AC = window.AudioContext || window.webkitAudioContext;
-                this.ctx = new AC();
-                const bufferSize = this.ctx.sampleRate * 2; 
-                this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-                const data = this.noiseBuffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+                if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+                const AC = window.AudioContext || window.webkitAudioContext; this.ctx = new AC();
+                const bufferSize = this.ctx.sampleRate * 2; this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = this.noiseBuffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
                 
                 this.engineOsc = this.ctx.createOscillator(); this.engineOsc.type = 'triangle'; this.engineOsc.frequency.value = 60;
                 this.engineGain = this.ctx.createGain(); this.engineGain.gain.value = 0;
@@ -429,94 +278,40 @@
                 this.engineOsc.connect(this.filter); this.filter.connect(this.engineGain); this.engineGain.connect(this.ctx.destination);
                 this.engineOsc.start();
 
-                this.skidOsc = this.ctx.createOscillator();
-                this.skidOsc.type = 'sawtooth';
-                this.skidOsc.frequency.value = 150;
-                this.skidGain = this.ctx.createGain();
-                this.skidGain.gain.value = 0;
-                this.skidOsc.connect(this.skidGain);
-                this.skidGain.connect(this.ctx.destination);
+                this.skidOsc = this.ctx.createOscillator(); this.skidOsc.type = 'sawtooth'; this.skidOsc.frequency.value = 150;
+                this.skidGain = this.ctx.createGain(); this.skidGain.gain.value = 0;
+                this.skidOsc.connect(this.skidGain); this.skidGain.connect(this.ctx.destination);
                 this.skidOsc.start();
 
-                // Music Setup
-                this.bgm = new Audio('music/cybertruck.mp3');
-                this.bgm.loop = true;
-                this.bgm.volume = 0.6;
+                this.bgm = new Audio('music/cybertruck.mp3'); this.bgm.loop = true; this.bgm.volume = 0.6;
             },
-            
-            playMusic: function() {
-                if (this.bgm && this.isMusicOn && this.bgm.paused) {
-                    this.bgm.play().catch(e => {});
-                }
-            },
-
+            playMusic: function() { if (this.bgm && this.isMusicOn && this.bgm.paused) this.bgm.play().catch(e=>{}); },
             toggleMusic: function() {
-                this.isMusicOn = !this.isMusicOn;
-                const btn = document.getElementById('music-indicator');
-                if (this.isMusicOn) {
-                    if(this.bgm) this.bgm.play();
-                    btn.innerText = "MUSIC: ON";
-                    btn.classList.remove('off');
-                } else {
-                    if(this.bgm) this.bgm.pause();
-                    btn.innerText = "MUSIC: OFF";
-                    btn.classList.add('off');
-                }
+                this.isMusicOn = !this.isMusicOn; const btn = document.getElementById('music-indicator');
+                if (this.isMusicOn) { if(this.bgm) this.bgm.play(); btn.innerText = "MUSIC: ON"; btn.classList.remove('off'); } 
+                else { if(this.bgm) this.bgm.pause(); btn.innerText = "MUSIC: OFF"; btn.classList.add('off'); }
             },
-
             toggleSfx: function() {
-                this.isSfxOn = !this.isSfxOn;
-                const btn = document.getElementById('sfx-indicator');
-                if(this.isSfxOn) {
-                    btn.innerText = "SFX: ON";
-                    btn.classList.remove('off');
-                } else {
-                    btn.innerText = "SFX: OFF";
-                    btn.classList.add('off');
-                    // Mute current loops immediately
-                    if(this.engineGain) this.engineGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
-                    if(this.skidGain) this.skidGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
-                }
+                this.isSfxOn = !this.isSfxOn; const btn = document.getElementById('sfx-indicator');
+                if(this.isSfxOn) { btn.innerText = "SFX: ON"; btn.classList.remove('off'); } 
+                else { btn.innerText = "SFX: OFF"; btn.classList.add('off'); if(this.engineGain) this.engineGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1); }
             },
-
             updateEngine: function(speedPercent, isSkidding) {
                 if (!this.ctx || !this.isSfxOn) return;
-
                 this.engineOsc.frequency.setTargetAtTime(60 + (speedPercent * 300), this.ctx.currentTime, 0.1);
                 const vol = (0.05 + (speedPercent * 0.1)) * 0.3; 
                 this.engineGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.1);
                 this.filter.frequency.setTargetAtTime(200 + (speedPercent * 3000), this.ctx.currentTime, 0.1);
-
-                if(isSkidding) {
-                    // REDUCED SKID VOLUME TO 0.06 (60% less than previous 0.15)
-                    this.skidGain.gain.setTargetAtTime(0.06, this.ctx.currentTime, 0.1);
-                    this.skidOsc.frequency.setTargetAtTime(150 + Math.random()*100, this.ctx.currentTime, 0.1);
-                } else {
-                    this.skidGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
-                }
-            },
-            
-            playLand: function(intensity) {
-                if (!this.ctx || !this.isSfxOn) return;
-                const src = this.ctx.createBufferSource(); src.buffer = this.noiseBuffer;
-                const gain = this.ctx.createGain(); gain.gain.setValueAtTime(Math.min(intensity * 0.5, 0.5), this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
-                const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(600, this.ctx.currentTime); filter.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.2);
-                src.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
-                src.start(); src.stop(this.ctx.currentTime + 0.3);
+                // Drift sound reduced by 60% (0.15 * 0.4 = 0.06)
+                const targetSkidVol = isSkidding ? 0.06 : 0;
+                this.skidGain.gain.setTargetAtTime(targetSkidVol, this.ctx.currentTime, 0.1);
             },
             playCollect: function() {
                 if (!this.ctx || !this.isSfxOn) return;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(800, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
-                osc.connect(gain); gain.connect(this.ctx.destination);
-                osc.start(); osc.stop(this.ctx.currentTime + 0.5);
+                const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                osc.type = 'sine'; osc.frequency.setValueAtTime(800, this.ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
+                osc.connect(gain); gain.connect(this.ctx.destination); osc.start(); osc.stop(this.ctx.currentTime + 0.5);
             }
         };
 
@@ -543,14 +338,9 @@
             document.addEventListener('keydown', (e) => { onKey(e, true); sfx.init(); sfx.playMusic(); });
             document.addEventListener('keyup', (e) => onKey(e, false));
             
-            const camInd = document.getElementById('camera-indicator'); 
-            camInd.addEventListener('click', (e) => { e.stopPropagation(); switchCamera(); });
-            
-            const musInd = document.getElementById('music-indicator');
-            musInd.addEventListener('click', (e) => { e.stopPropagation(); sfx.toggleMusic(); });
-
-            const sfxInd = document.getElementById('sfx-indicator');
-            sfxInd.addEventListener('click', (e) => { e.stopPropagation(); sfx.toggleSfx(); });
+            document.getElementById('camera-indicator').addEventListener('click', (e) => { e.stopPropagation(); switchCamera(); });
+            document.getElementById('music-indicator').addEventListener('click', (e) => { e.stopPropagation(); sfx.toggleMusic(); });
+            document.getElementById('sfx-indicator').addEventListener('click', (e) => { e.stopPropagation(); sfx.toggleSfx(); });
 
             controls.init(); 
             animate();
@@ -564,99 +354,73 @@
             if(text && text.className !== 'error-msg') text.innerText = "DOWNLOADING... " + total + "%";
         }
 
-        function reportError(name) {
-             const text = document.getElementById('loading-text');
-             if(text) { text.innerText = "ERROR: " + name + " NOT FOUND. USING FALLBACK."; text.className = "error-msg"; }
+        function checkLoading() { 
+            if (assetsLoaded >= assetsTotal) { 
+                sfx.init(); sfx.playMusic();
+                setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 500); 
+            } 
         }
-
-        function createRings() {
-            const geo = new THREE.TorusGeometry(0.8, 0.15, 8, 16);
-            const mat = new THREE.MeshStandardMaterial({ 
-                color: 0xFFFF00, metalness: 0.1, roughness: 0.2, emissive: 0xFFFF00, emissiveIntensity: 0.8
-            });
-
-            for(let i=0; i<20; i++) {
-                const ring = new THREE.Mesh(geo, mat);
-                const x = (Math.random() - 0.5) * 300;
-                const z = (Math.random() - 0.5) * 300;
-                const y = getTerrainHeight(x, z);
-                ring.position.set(x, y + 0.2, z); 
-                ring.rotation.y = Math.random() * Math.PI;
-                ring.castShadow = true;
-                scene.add(ring);
-                rings.push(ring);
-            }
-        }
-
+        
+        // ... (Standard Loaders from previous steps, but with MORE trees)
         function loadModels() {
             const loader = new FBXLoader();
             bikeGroup = new THREE.Group(); scene.add(bikeGroup); 
+            
+            // Visual holder for drift rotation
+            bikeVisuals = new THREE.Group();
+            bikeGroup.add(bikeVisuals);
 
-            // 1. Load Moto
             loader.load('fbx/moto.fbx', (object) => {
-                object.scale.set(0.005, 0.005, 0.005);
-                object.rotation.y = 0; 
+                object.scale.set(0.005, 0.005, 0.005); object.rotation.y = 0; 
                 object.traverse((child) => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
-                bikeGroup.add(object);
+                bikeVisuals.add(object);
                 addExhaust();
-                assetsLoaded++;
-                checkLoading();
-            }, (xhr) => { if (xhr.lengthComputable) { progressMoto = (xhr.loaded / xhr.total) * 100; updateProgress(); } else { progressMoto = 50; updateProgress(); }
-            }, (error) => { console.warn("Moto FBX missing."); reportError("moto.fbx"); createFallbackBike(); assetsLoaded++; checkLoading(); });
+                assetsLoaded++; checkLoading();
+            }, (xhr) => { if (xhr.lengthComputable) { progressMoto = (xhr.loaded / xhr.total) * 100; updateProgress(); } else { progressMoto = 50; updateProgress(); } }, 
+            (error) => { console.warn("Moto missing"); assetsLoaded++; checkLoading(); });
 
-            // 2. Load FBX Tree (Increased count from 40 to 80)
             loader.load('fbx/Tree.fbx', (object) => {
-                const count = 80; 
-                const dummy = new THREE.Object3D();
-                const transforms = [];
+                // DOUBLED TREE COUNT
+                const count = 80; const dummy = new THREE.Object3D(); const transforms = [];
                 for(let i=0; i<count; i++) {
-                    const x = (Math.random() - 0.5) * 200;
-                    const z = (Math.random() - 0.5) * 200;
+                    const x = (Math.random() - 0.5) * 200; const z = (Math.random() - 0.5) * 200;
                     if (Math.abs(x) < 20 && Math.abs(z) < 20) { i--; continue; } 
                     const y = getTerrainHeight(x, z);
-                    const s = 0.015 * (0.8 + Math.random() * 0.5); 
-                    dummy.position.set(x, y, z);
-                    dummy.rotation.set(0, Math.random() * Math.PI * 2, 0); 
-                    dummy.scale.set(s, s, s);
-                    dummy.updateMatrix();
-                    transforms.push(dummy.matrix.clone());
-                    obstacles.push({ x: x, z: z, radius: 1.5 });
+                    dummy.position.set(x, y, z); dummy.rotation.set(0, Math.random() * Math.PI * 2, 0); dummy.scale.set(0.015, 0.015, 0.015); dummy.updateMatrix();
+                    transforms.push(dummy.matrix.clone()); obstacles.push({ x: x, z: z, radius: 1.5 });
                 }
                 object.traverse((child) => {
                     if (child.isMesh) {
                         const instancedMesh = new THREE.InstancedMesh(child.geometry, child.material, count);
-                        instancedMesh.castShadow = true;
-                        instancedMesh.receiveShadow = true;
+                        instancedMesh.castShadow = true; instancedMesh.receiveShadow = true;
                         for(let i=0; i<count; i++) instancedMesh.setMatrixAt(i, transforms[i]);
-                        instancedMesh.instanceMatrix.needsUpdate = true;
-                        scene.add(instancedMesh);
+                        instancedMesh.instanceMatrix.needsUpdate = true; scene.add(instancedMesh);
                     }
                 });
-                assetsLoaded++;
-                checkLoading();
-            }, (xhr) => { if (xhr.lengthComputable) { progressTree = (xhr.loaded / xhr.total) * 100; updateProgress(); } else { progressTree = 50; updateProgress(); }
-            }, (err) => { console.warn("Tree FBX missing."); reportError("Tree.fbx"); createFallbackTrees(); assetsLoaded++; checkLoading(); });
+                assetsLoaded++; checkLoading();
+            }, (xhr) => { if (xhr.lengthComputable) { progressTree = (xhr.loaded / xhr.total) * 100; updateProgress(); } else { progressTree = 50; updateProgress(); } }, 
+            (err) => { console.warn("Tree missing"); assetsLoaded++; checkLoading(); });
 
-            createProceduralPines();
-            createRocks();
-            // Removed createFences call
+            createProceduralPines(); createRocks();
+            // Fences removed as requested
         }
 
         function createProceduralPines() {
-            const trunkGeo = new THREE.CylinderGeometry(0.2, 0.4, 1.5, 5); trunkGeo.translate(0, 0.75, 0);
-            const leaves1 = new THREE.ConeGeometry(1.2, 1.5, 5); leaves1.translate(0, 2.0, 0);
-            const leaves2 = new THREE.ConeGeometry(0.9, 1.2, 5); leaves2.translate(0, 2.8, 0);
-            const leaves3 = new THREE.ConeGeometry(0.6, 1.0, 5); leaves3.translate(0, 3.5, 0);
-            // Increased count from 40 to 80
-            const count = 80;
+            // DOUBLED PINE COUNT
+            const count = 80; 
             const dummy = new THREE.Object3D();
+            const trunkGeo = new THREE.CylinderGeometry(0.2, 0.4, 1.5, 5); trunkGeo.translate(0, 0.75, 0);
+            const leafGeo = BufferGeometryUtils.mergeGeometries([
+                new THREE.ConeGeometry(1.2, 1.5, 5).translate(0, 2.0, 0),
+                new THREE.ConeGeometry(0.9, 1.2, 5).translate(0, 2.8, 0),
+                new THREE.ConeGeometry(0.6, 1.0, 5).translate(0, 3.5, 0)
+            ]);
             const trunkMat = new THREE.MeshStandardMaterial({color: 0x3d2817});
             const leafMat = new THREE.MeshStandardMaterial({color: 0x1a472a});
             const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
-            const leafGeo = BufferGeometryUtils.mergeGeometries([leaves1, leaves2, leaves3]);
             const leafMesh = new THREE.InstancedMesh(leafGeo, leafMat, count);
-            trunkMesh.castShadow = true; trunkMesh.receiveShadow = true;
-            leafMesh.castShadow = true; leafMesh.receiveShadow = true;
+            trunkMesh.castShadow = true; trunkMesh.receiveShadow = true; leafMesh.castShadow = true; leafMesh.receiveShadow = true;
+            
             for(let i=0; i<count; i++) {
                 const x = (Math.random() - 0.5) * 300; const z = (Math.random() - 0.5) * 300;
                 if(Math.abs(x) < 20 && Math.abs(z) < 20) { i--; continue; }
@@ -668,34 +432,11 @@
             scene.add(trunkMesh); scene.add(leafMesh);
         }
 
-        function createFallbackBike() {
-            const geo = new THREE.BoxGeometry(0.5, 0.5, 1); const mat = new THREE.MeshStandardMaterial({color: 0xff0000}); const mesh = new THREE.Mesh(geo, mat); mesh.position.y = 0.5; bikeGroup.add(mesh); addExhaust();
-        }
-        function createFallbackTrees() {
-            const geo = new THREE.ConeGeometry(1, 4, 8); const mat = new THREE.MeshStandardMaterial({color: 0x00ff00});
-            for(let i=0; i<30; i++) { const x = (Math.random() - 0.5) * 200; const z = (Math.random() - 0.5) * 200; const y = getTerrainHeight(x, z); const mesh = new THREE.Mesh(geo, mat); mesh.position.set(x, y+2, z); scene.add(mesh); obstacles.push({ x: x, z: z, radius: 1.5 }); }
-        }
-        function addExhaust() { const exhaustPoint = new THREE.Object3D(); exhaustPoint.position.set(0, 0.5, -1.2); exhaustPoint.name = "exhaust"; bikeGroup.add(exhaustPoint); }
-        function checkLoading() { 
-            if (assetsLoaded >= assetsTotal) { 
-                sfx.init(); sfx.playMusic();
-                setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 500); 
-            } 
-        }
-        
-        function setupTouchControls() {
-            joystick.init();
-            const bindBtn = (id, key) => {
-                const btn = document.getElementById(id);
-                const start = (e) => { e.preventDefault(); keys[key] = true; btn.classList.add('active'); sfx.init(); sfx.playMusic(); if(window.navigator.vibrate) window.navigator.vibrate(10); };
-                const end = (e) => { e.preventDefault(); keys[key] = false; btn.classList.remove('active'); };
-                btn.addEventListener('touchstart', start, { passive: false }); btn.addEventListener('touchend', end, { passive: false });
-            };
-            // No buttons anymore, just zones
-        }
+        function addExhaust() { const exhaustPoint = new THREE.Object3D(); exhaustPoint.position.set(0, 0.5, -1.2); exhaustPoint.name = "exhaust"; bikeVisuals.add(exhaustPoint); }
 
         function createTerrain() {
-            const geometry = new THREE.PlaneGeometry(400, 400, 400, 400); geometry.rotateX(-Math.PI / 2); const positions = geometry.attributes.position.array;
+            const geometry = new THREE.PlaneGeometry(400, 400, 400, 400); geometry.rotateX(-Math.PI / 2); 
+            const positions = geometry.attributes.position.array;
             for (let i = 0; i < positions.length; i += 3) {
                 const x = positions[i]; const z = positions[i + 2];
                 const y = (Math.sin(x * 0.03) * 5) + (Math.cos(z * 0.03) * 5) + (Math.sin(x * 0.1 + z * 0.1) * 1.5) + (Math.random() * 0.2);
@@ -720,61 +461,61 @@
             for(let i=0; i< 30; i++) { const x = (Math.random() - 0.5) * 350; const z = (Math.random() - 0.5) * 350; const y = getTerrainHeight(x, z); const rock = new THREE.Mesh(rockGeo, rockMat); rock.position.set(x, y + 0.5, z); rock.scale.set(1 + Math.random(), 1 + Math.random(), 1 + Math.random()); rock.rotation.set(Math.random(), Math.random(), Math.random()); rock.castShadow = true; scene.add(rock); obstacles.push({ x: x, z: z, radius: 1.0 }); }
         }
         
-        function createDust() {
-            if(!bikeGroup) return; const exhaust = bikeGroup.getObjectByName("exhaust"); if (!exhaust) return; if (Math.abs(speed) < 0.1) return;
-            const pos = new THREE.Vector3(); exhaust.getWorldPosition(pos); const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2); const mat = new THREE.MeshBasicMaterial({ color: 0x8b7e66, transparent: true, opacity: 0.4 }); const p = new THREE.Mesh(geo, mat); p.position.copy(pos); p.position.x += (Math.random() - 0.5) * 0.3; const gH = getTerrainHeight(pos.x, pos.z); if(p.position.y < gH) p.position.y = gH + 0.2; scene.add(p); particles.push({ mesh: p, life: 1.0 });
+        function createRings() {
+            const geo = new THREE.TorusGeometry(0.8, 0.15, 8, 16);
+            const mat = new THREE.MeshStandardMaterial({ color: 0xFFFF00, metalness: 0.1, roughness: 0.2, emissive: 0xFFFF00, emissiveIntensity: 0.8 });
+            for(let i=0; i<20; i++) {
+                const ring = new THREE.Mesh(geo, mat);
+                const x = (Math.random() - 0.5) * 300; const z = (Math.random() - 0.5) * 300;
+                const y = getTerrainHeight(x, z);
+                ring.position.set(x, y + 0.2, z); ring.rotation.y = Math.random() * Math.PI; ring.castShadow = true;
+                scene.add(ring); rings.push(ring);
+            }
         }
-        function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { const p = particles[i]; p.life -= 0.02; p.mesh.position.y += 0.02; p.mesh.scale.multiplyScalar(1.05); p.mesh.material.opacity = p.life * 0.4; p.mesh.rotation.x += 0.1; if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); } } }
-        function onKey(e, pressed) { const k = e.key.toLowerCase(); if (k === 'w' || k === 'arrowup') keys.w = pressed; if (k === 's' || k === 'arrowdown') keys.s = pressed; if (k === 'a' || k === 'arrowleft') keys.a = pressed; if (k === 'd' || k === 'arrowright') keys.d = pressed; if (k === ' ') keys.space = pressed; }
+
+        function createDust() {
+            if(!bikeVisuals) return; 
+            const exhaust = bikeVisuals.getObjectByName("exhaust"); 
+            if (!exhaust) return; if (Math.abs(speed) < 0.1) return;
+            const pos = new THREE.Vector3(); exhaust.getWorldPosition(pos); 
+            const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2); 
+            const mat = new THREE.MeshBasicMaterial({ color: 0x8b7e66, transparent: true, opacity: 0.4 }); 
+            const p = new THREE.Mesh(geo, mat); 
+            p.position.copy(pos); 
+            p.position.x += (Math.random() - 0.5) * 0.3; 
+            const gH = getTerrainHeight(pos.x, pos.z); 
+            if(p.position.y < gH) p.position.y = gH + 0.2; 
+            scene.add(p); 
+            particles.push({ mesh: p, life: 1.0 });
+        }
+        
+        function updateParticles() { 
+            for (let i = particles.length - 1; i >= 0; i--) { 
+                const p = particles[i]; p.life -= 0.02; p.mesh.position.y += 0.02; p.mesh.scale.multiplyScalar(1.05); p.mesh.material.opacity = p.life * 0.4; p.mesh.rotation.x += 0.1; 
+                if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); } 
+            } 
+        }
+
+        function onKey(e, pressed) { 
+            const k = e.key.toLowerCase(); 
+            if (k === 'w' || k === 'arrowup') keys.w = pressed; 
+            if (k === 's' || k === 'arrowdown') keys.s = pressed; 
+            if (k === 'a' || k === 'arrowleft') keys.a = pressed; 
+            if (k === 'd' || k === 'arrowright') keys.d = pressed; 
+            if (k === ' ') keys.brake = pressed; // Space is Handbrake
+        }
         
         function switchCamera() { 
             activeCameraMode = (activeCameraMode + 1) % 2; 
             const ind = document.getElementById('camera-indicator'); 
             let nextMode = (activeCameraMode + 1) % 2;
-            let label = "";
-            switch(nextMode) {
-                case 0: label = "CAM: ANGLED VIEW"; break;
-                case 1: label = "CAM: TOP VIEW"; break;
-            }
-            ind.innerText = label;
+            ind.innerText = nextMode === 0 ? "CAM: ANGLED VIEW" : "CAM: TOP VIEW";
         }
         
         function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
         function checkCollisions(newX, newZ) { const bikeRadius = 0.5; for(let obs of obstacles) { const dx = newX - obs.x; const dz = newZ - obs.z; const dist = Math.sqrt(dx*dx + dz*dz); if (dist < (bikeRadius + obs.radius)) return true; } return false; }
-
-        function checkRings() {
-            const playerPos = bikeGroup.position;
-            for(let i = rings.length - 1; i >= 0; i--) {
-                const ring = rings[i];
-                ring.rotation.y += 0.05; // Spin animation
-                const dx = playerPos.x - ring.position.x;
-                const dy = (playerPos.y + 0.5) - ring.position.y; 
-                const dz = playerPos.z - ring.position.z;
-                const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-
-                if (dist < 2.0) {
-                    scene.remove(ring); rings.splice(i, 1); sfx.playCollect(); battery = Math.min(100, battery + RING_CHARGE);
-                }
-            }
-        }
-
-        function updateBattery() {
-            if (Math.abs(speed) > 0.01) {
-                battery -= BATTERY_DRAIN;
-                if (battery < 0) battery = 0;
-            }
-            
-            // UI Update
-            const bar = document.getElementById('battery-bar');
-            const txt = document.getElementById('battery-text');
-            bar.style.width = battery + "%";
-            txt.innerText = "BATTERY: " + Math.round(battery) + "%";
-            
-            // Speed Limit if Battery Low
-            if (battery <= 0) {
-                speed *= 0.95; // Slow to stop
-            }
-        }
+        function checkRings() { const playerPos = bikeGroup.position; for(let i = rings.length - 1; i >= 0; i--) { const ring = rings[i]; ring.rotation.y += 0.05; const dx = playerPos.x - ring.position.x; const dy = (playerPos.y + 0.5) - ring.position.y; const dz = playerPos.z - ring.position.z; const dist = Math.sqrt(dx*dx + dy*dy + dz*dz); if (dist < 2.0) { scene.remove(ring); rings.splice(i, 1); sfx.playCollect(); battery = Math.min(100, battery + RING_CHARGE); } } }
+        function updateBattery() { if (Math.abs(speed) > 0.01) { battery -= BATTERY_DRAIN; if (battery < 0) battery = 0; } const bar = document.getElementById('battery-bar'); const txt = document.getElementById('battery-text'); bar.style.width = battery + "%"; txt.innerText = "BATTERY: " + Math.round(battery) + "%"; if (battery <= 0) speed *= 0.95; }
 
         function animate(time) {
             requestAnimationFrame(animate);
@@ -786,44 +527,59 @@
             if (keys.s) throttleInput -= 1;
             if (Math.abs(analogThrottle) > 0.1) throttleInput += analogThrottle;
 
-            if (battery > 0) { if (throttleInput > 0) speed += ACCEL * throttleInput; }
+            if (battery > 0 && throttleInput > 0) speed += ACCEL * throttleInput;
             if (throttleInput < 0) speed += ACCEL * throttleInput; 
             
-            // BRAKE LOGIC
-            if (keys.brake) {
-                speed *= BRAKE_FRICTION; // Strong slow down
-            } else {
-                speed *= FRICTION; // Normal friction
-            }
+            speed *= FRICTION;
             
             let turnInput = 0; if (keys.a) turnInput += 1; if (keys.d) turnInput -= 1; turnInput += analogSteering; 
-            if (bikeGroup && Math.abs(speed) > 0.05) bikeGroup.rotation.y += turnInput * TURN_SPEED;
-
+            
             // DRIFT LOGIC
             let isDrifting = false;
-            if (Math.abs(speed) > 0.4 && Math.abs(turnInput) > 0.5 && keys.brake) {
+            if (keys.brake && Math.abs(speed) > 0.3 && Math.abs(turnInput) > 0.3) {
                 isDrifting = true;
+                // Lose friction but maintain momentum
+                speed *= DRIFT_FRICTION; 
+                // Increase turn rate (oversteer)
+                bikeGroup.rotation.y += turnInput * (TURN_SPEED * 1.8);
+            } else {
+                // Standard turn
+                if (Math.abs(speed) > 0.05) bikeGroup.rotation.y += turnInput * TURN_SPEED;
             }
 
             if (bikeGroup) {
-                const nextVel = new THREE.Vector3(0, 0, speed); 
-                nextVel.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                const nextX = bikeGroup.position.x + nextVel.x; 
-                const nextZ = bikeGroup.position.z + nextVel.z;
-
+                // CALCULATE MOVEMENT
+                // If drifting, we don't just move where we face. We slide.
+                const forwardDir = new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0), bikeGroup.rotation.y);
+                
                 if(isDrifting) {
-                    const slideAmt = speed * turnInput * 0.08; // Stronger drift
-                    bikeGroup.rotation.y += turnInput * 0.05; 
-                    bikeGroup.translateX(-slideAmt); 
-                    if(frameCount % 3 === 0) createDust(); 
+                    // Create a slide vector that pushes slightly opposite to the turn (centrifugal force feel)
+                    // Simplified: Just move in the direction of momentum (previous velocity would be best, but simple forward override works)
+                    // Actually, for arcade feel: Move roughly forward but slide sideways
+                    const slideForce = speed * 0.2;
+                    // We drift OUT of the turn. If turning LEFT (turnInput > 0), we slide RIGHT (local -X).
+                    bikeGroup.translateX(-turnInput * slideForce);
+                    
+                    // Visual Tilt
+                    if(bikeVisuals) bikeVisuals.rotation.y = -turnInput * 0.5; // Oversteer visual
+                    
+                    if(frameCount % 3 === 0) createDust();
+                } else {
+                    if(bikeVisuals) bikeVisuals.rotation.y *= 0.9; // Reset visual
                 }
+                
+                // Apply Velocity
+                const moveDist = speed;
+                const dx = Math.sin(bikeGroup.rotation.y) * moveDist;
+                const dz = Math.cos(bikeGroup.rotation.y) * moveDist;
+                const nextX = bikeGroup.position.x + dx;
+                const nextZ = bikeGroup.position.z + dz;
 
                 if (checkCollisions(nextX, nextZ)) { 
                     speed = -speed * 0.5; sfx.playLand(1.0); 
                 } else { 
-                    velocity.set(0, 0, speed); 
-                    velocity.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y); 
-                    bikeGroup.position.add(velocity); 
+                    bikeGroup.position.x += dx;
+                    bikeGroup.position.z += dz;
                 }
 
                 if (bikeGroup.position.x > MAP_LIMIT) { bikeGroup.position.x = MAP_LIMIT; speed = 0; }
@@ -836,46 +592,39 @@
                 updateBattery();
 
                 const groundH = getTerrainHeight(bikeGroup.position.x, bikeGroup.position.z);
-                verticalVelocity -= GRAVITY; 
-                bikeGroup.position.y += verticalVelocity;
-
-                // REINFORCED GROUND CLAMP
-                if (bikeGroup.position.y < groundH) { 
-                    bikeGroup.position.y = groundH; 
-                    verticalVelocity = 0; 
-                }
-                if (bikeGroup.position.y < groundH) {
-                    bikeGroup.position.y = groundH;
-                }
-
-                const aheadV = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                const nextXPos = bikeGroup.position.x + aheadV.x; 
-                const nextZPos = bikeGroup.position.z + aheadV.z; 
-                const nextH = getTerrainHeight(nextXPos, nextZPos);
                 
-                const angle = Math.atan2(nextH - groundH, 1.0); 
-                bikeGroup.rotation.x = THREE.MathUtils.lerp(bikeGroup.rotation.x, -angle, 0.2);
+                // FORCE GROUND CLAMP (No jumping)
+                bikeGroup.position.y = groundH;
+
+                // Align to terrain normal
+                const aheadX = bikeGroup.position.x + Math.sin(bikeGroup.rotation.y);
+                const aheadZ = bikeGroup.position.z + Math.cos(bikeGroup.rotation.y);
+                const aheadH = getTerrainHeight(aheadX, aheadZ);
+                const pitch = Math.atan2(aheadH - groundH, 1.0);
+                bikeGroup.rotation.x = THREE.MathUtils.lerp(bikeGroup.rotation.x, -pitch, 0.2);
                 
+                // Roll
                 const targetRoll = turnInput * 0.3; 
                 bikeGroup.rotation.z = THREE.MathUtils.lerp(bikeGroup.rotation.z, targetRoll, 0.1);
 
+                // Camera Follow
                 const targetPos = bikeGroup.position.clone();
                 let camOffset = new THREE.Vector3();
-                let lookOffset = new THREE.Vector3(0, 1, 0);
+                let lookOffset = new THREE.Vector3(0, 2, 0);
 
-                // --- 2 CAMERA MODES LOGIC ---
                 switch(activeCameraMode) {
-                    case 0: // Chase Standard
+                    case 0: // Chase
                         camOffset.set(0, 4, -8);
                         camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
                         break;
-                    case 1: // Top Down (Relative)
-                        camOffset.set(0, 25, -2);
-                        camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
+                    case 1: // Top
+                        camOffset.set(0, 25, -2); // High up
+                        camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y); // Rotate with bike
                         break;
                 }
 
                 const camPos = targetPos.clone().add(camOffset);
+                // Cam collision
                 const camGroundH = getTerrainHeight(camPos.x, camPos.z);
                 if (camPos.y < camGroundH + 1.0) camPos.y = camGroundH + 1.0;
 
