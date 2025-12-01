@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Tesla Madness 1998 - Smart Audio</title>
+    <title>Tesla Madness 1998 - Ready</title>
     
     <script type="importmap">
     {
@@ -104,17 +104,40 @@
         /* LOADING SCREEN */
         #loading {
             position: absolute;
-            top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: clamp(280px, 60vw, 500px);
-            background: black; padding: 20px; border: 2px solid #ffcc00;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: black;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 100; text-align: center; box-shadow: 0 0 20px rgba(255, 204, 0, 0.2);
+            z-index: 1000;
+        }
+        .loading-box {
+            width: clamp(280px, 60vw, 500px);
+            text-align: center;
+            padding: 20px;
+            border: 2px solid #ffcc00;
+            box-shadow: 0 0 20px rgba(255, 204, 0, 0.2);
+            background: #111;
         }
         .loading-title { color: white; font-size: clamp(16px, 4vw, 20px); margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
         .progress-track { width: 100%; height: 20px; background: #222; border: 1px solid #555; margin-bottom: 10px; position: relative; }
         #progress-bar { width: 0%; height: 100%; background: #ffcc00; transition: width 0.2s; }
         #loading-text { color: #aaa; font-size: 12px; }
-        .error-msg { color: #ff3333 !important; }
+        
+        /* START BUTTON (Overlay) */
+        #start-overlay {
+            display: none; /* Hidden until loaded */
+            margin-top: 20px;
+            padding: 15px 30px;
+            background: #ffcc00;
+            color: #000;
+            font-weight: bold;
+            font-size: 20px;
+            border: none;
+            cursor: pointer;
+            text-transform: uppercase;
+            animation: pulse 1s infinite;
+            width: 100%;
+        }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
 
         /* CONTROLS */
         .touch-controls {
@@ -138,11 +161,14 @@
 <body>
 
     <div id="loading">
-        <div class="loading-title">CHARGING BATTERIES...</div>
-        <div class="progress-track">
-            <div id="progress-bar"></div>
+        <div class="loading-box">
+            <div class="loading-title">CHARGING BATTERIES...</div>
+            <div class="progress-track">
+                <div id="progress-bar"></div>
+            </div>
+            <div id="loading-text">LOADING ASSETS...</div>
+            <button id="start-overlay">TAP TO START</button>
         </div>
-        <div id="loading-text">LOADING ASSETS...</div>
     </div>
 
     <div id="ui-layer">
@@ -151,7 +177,7 @@
             <div id="battery-bar"></div>
             <div id="battery-text">BATTERY: 100%</div>
         </div>
-        <p>COLLECT <span style="color:gold">GOLD RINGS</span></p>
+        <p>COLLECT <span style="color:gold">GOLD RINGS</span> TO RECHARGE</p>
     </div>
 
     <div class="hud-stats">
@@ -187,7 +213,6 @@
         let scene, camera, renderer;
         let bikeGroup, bikeVisuals, terrainMesh;
         
-        // PHYSICS
         let speed = 0;
         let velocity = new THREE.Vector3();
         let verticalVelocity = 0; 
@@ -197,14 +222,13 @@
         let lastTime = 0;
         let isAirborne = false;
         let assetsLoaded = 0;
-        let assetsTotal = 1; 
+        let assetsTotal = 1; // Moto only
         let obstacles = [];
+        let gameStarted = false;
         
         let progressMoto = 0;
-        let progressTree = 0;
         let battery = 100;
         
-        // TUNING
         const BATTERY_DRAIN = 0.05; 
         const RING_CHARGE = 20;
         const MAX_SPEED = 1.4;
@@ -229,15 +253,15 @@
                 const knob = document.getElementById('joy-knob');
                 
                 zone.addEventListener('touchstart', (e) => {
+                    if(!gameStarted) return;
                     e.preventDefault(); const touch = e.changedTouches[0]; this.active = true;
                     const rect = zone.getBoundingClientRect(); this.origin.x = touch.clientX - rect.left; this.origin.y = touch.clientY - rect.top;
                     visual.style.display = 'block'; visual.style.left = this.origin.x + 'px'; visual.style.top = this.origin.y + 'px'; knob.style.transform = `translate(-50%, -50%)`;
-                    sfx.init(); sfx.playMusic();
                 }, { passive: false });
 
                 zone.addEventListener('touchmove', (e) => {
-                    if (!this.active) return; e.preventDefault(); const touch = e.changedTouches[0]; const rect = zone.getBoundingClientRect();
-                    let dx = (touch.clientX - rect.left) - this.origin.x; let dy = (touch.clientY - rect.top) - this.origin.y;
+                    if (!this.active) return; e.preventDefault(); const touch = e.changedTouches[0]; 
+                    let dx = (touch.clientX - zone.getBoundingClientRect().left) - this.origin.x; let dy = (touch.clientY - zone.getBoundingClientRect().top) - this.origin.y;
                     const dist = Math.sqrt(dx*dx + dy*dy);
                     if (dist > this.maxDist) { const angle = Math.atan2(dy, dx); dx = Math.cos(angle) * this.maxDist; dy = Math.sin(angle) * this.maxDist; }
                     knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
@@ -251,7 +275,8 @@
                 const brakeZone = document.getElementById('brake-zone');
                 const brakeVisual = document.getElementById('brake-visual');
                 brakeZone.addEventListener('touchstart', (e) => {
-                    e.preventDefault(); const touch = e.changedTouches[0]; keys.brake = true; sfx.init(); sfx.playMusic();
+                    if(!gameStarted) return;
+                    e.preventDefault(); const touch = e.changedTouches[0]; keys.brake = true;
                     if(window.navigator.vibrate) window.navigator.vibrate(10);
                     const rect = brakeZone.getBoundingClientRect();
                     brakeVisual.style.display = 'block'; brakeVisual.style.left = (touch.clientX - rect.left) + 'px'; brakeVisual.style.top = (touch.clientY - rect.top) + 'px';
@@ -280,32 +305,22 @@
                 this.skidOsc.connect(this.skidGain); this.skidGain.connect(this.ctx.destination);
                 this.skidOsc.start();
 
-                // MUSIC SETUP WITH FALLBACK
+                // MUSIC
                 this.bgm = new Audio();
                 this.bgm.loop = true;
                 this.bgm.volume = 0.6;
-                
                 const highRes = 'music/cybertruck.mp3';
                 const lowRes = 'music/cybertrucklowres.mp3';
-                
                 this.bgm.src = highRes;
                 
-                // Timeout for slow connection (3s)
                 const slowNetTimeout = setTimeout(() => {
                     if (this.bgm.readyState < 3) {
-                        console.log("Slow connection. Switching to low-res music.");
                         this.bgm.src = lowRes;
-                        if(this.isMusicOn) this.bgm.play().catch(e=>{});
+                        if(this.isMusicOn && gameStarted) this.bgm.play().catch(e=>{});
                     }
                 }, 3000);
-                
                 this.bgm.addEventListener('canplaythrough', () => clearTimeout(slowNetTimeout));
-                
-                this.bgm.onerror = () => {
-                    console.warn("High-res music failed. Switching to low-res.");
-                    this.bgm.src = lowRes;
-                    if(this.isMusicOn) this.bgm.play().catch(e=>{});
-                };
+                this.bgm.onerror = () => { this.bgm.src = lowRes; if(this.isMusicOn && gameStarted) this.bgm.play().catch(e=>{}); };
             },
             playMusic: function() { if (this.bgm && this.isMusicOn && this.bgm.paused) this.bgm.play().catch(e=>{}); },
             toggleMusic: function() {
@@ -354,8 +369,9 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
             renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
             container.appendChild(renderer.domElement);
+            
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); scene.add(ambientLight);
             const dirLight = new THREE.DirectionalLight(0xffffff, 1.5); dirLight.position.set(50, 100, 50); dirLight.castShadow = true;
             dirLight.shadow.mapSize.width = 4096; dirLight.shadow.mapSize.height = 4096; dirLight.shadow.bias = -0.0001;
@@ -366,19 +382,31 @@
             loadModels();
 
             window.addEventListener('resize', onWindowResize);
-            document.addEventListener('keydown', (e) => { onKey(e, true); sfx.init(); sfx.playMusic(); });
+            document.addEventListener('keydown', (e) => { 
+                if(!gameStarted) return;
+                onKey(e, true); 
+            });
             document.addEventListener('keyup', (e) => onKey(e, false));
             
             document.getElementById('camera-indicator').addEventListener('click', (e) => { e.stopPropagation(); switchCamera(); });
             document.getElementById('music-indicator').addEventListener('click', (e) => { e.stopPropagation(); sfx.toggleMusic(); });
             document.getElementById('sfx-indicator').addEventListener('click', (e) => { e.stopPropagation(); sfx.toggleSfx(); });
 
+            // START BUTTON
+            const startBtn = document.getElementById('start-overlay');
+            startBtn.addEventListener('click', () => {
+                gameStarted = true;
+                document.getElementById('loading').style.display = 'none';
+                sfx.init();
+                sfx.playMusic();
+            });
+
             controls.init(); 
             animate();
         }
 
         function updateProgress() {
-            const total = Math.round((progressMoto + progressTree) / 2);
+            const total = Math.round(progressMoto);
             const bar = document.getElementById('progress-bar');
             const text = document.getElementById('loading-text');
             if(bar) bar.style.width = total + "%";
@@ -432,6 +460,7 @@
             const leaves1 = new THREE.ConeGeometry(1.2, 1.5, 5); leaves1.translate(0, 2.0, 0);
             const leaves2 = new THREE.ConeGeometry(0.9, 1.2, 5); leaves2.translate(0, 2.8, 0);
             const leaves3 = new THREE.ConeGeometry(0.6, 1.0, 5); leaves3.translate(0, 3.5, 0);
+            // Increase count
             const count = 120;
             const dummy = new THREE.Object3D();
             const trunkMat = new THREE.MeshStandardMaterial({color: 0x3d2817});
@@ -458,22 +487,13 @@
         function addExhaust() { const exhaustPoint = new THREE.Object3D(); exhaustPoint.position.set(0, 0.5, -1.2); exhaustPoint.name = "exhaust"; bikeVisuals.add(exhaustPoint); }
         function checkLoading() { 
             if (assetsLoaded >= assetsTotal) { 
-                sfx.init(); sfx.playMusic();
-                setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 500); 
+                document.getElementById('loading-text').style.display = 'none';
+                document.getElementById('progress-bar').parentElement.style.display = 'none';
+                const btn = document.getElementById('start-overlay');
+                btn.style.display = 'block'; 
             } 
         }
         
-        function setupTouchControls() {
-            joystick.init();
-            const bindBtn = (id, key) => {
-                const btn = document.getElementById(id);
-                const start = (e) => { e.preventDefault(); keys[key] = true; btn.classList.add('active'); sfx.init(); sfx.playMusic(); if(window.navigator.vibrate) window.navigator.vibrate(10); };
-                const end = (e) => { e.preventDefault(); keys[key] = false; btn.classList.remove('active'); };
-                btn.addEventListener('touchstart', start, { passive: false }); btn.addEventListener('touchend', end, { passive: false });
-            };
-            // No buttons anymore, just zones
-        }
-
         function createTerrain() {
             const geometry = new THREE.PlaneGeometry(400, 400, 400, 400); geometry.rotateX(-Math.PI / 2); const positions = geometry.attributes.position.array;
             for (let i = 0; i < positions.length; i += 3) {
@@ -494,11 +514,7 @@
         }
 
         function getTerrainHeight(x, z) { const raycaster = new THREE.Raycaster(); raycaster.set(new THREE.Vector3(x, 100, z), new THREE.Vector3(0, -1, 0)); const intersects = raycaster.intersectObject(terrainMesh); return intersects.length > 0 ? intersects[0].point.y : 0; }
-        
-        function createRocks() {
-             const rockGeo = new THREE.DodecahedronGeometry(1, 0); const rockMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.9 });
-            for(let i=0; i< 30; i++) { const x = (Math.random() - 0.5) * 350; const z = (Math.random() - 0.5) * 350; const y = getTerrainHeight(x, z); const rock = new THREE.Mesh(rockGeo, rockMat); rock.position.set(x, y + 0.5, z); rock.scale.set(1 + Math.random(), 1 + Math.random(), 1 + Math.random()); rock.rotation.set(Math.random(), Math.random(), Math.random()); rock.castShadow = true; scene.add(rock); obstacles.push({ x: x, z: z, radius: 1.0 }); }
-        }
+        function createRocks() { const rockGeo = new THREE.DodecahedronGeometry(1, 0); const rockMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.9 }); for(let i=0; i< 30; i++) { const x = (Math.random() - 0.5) * 350; const z = (Math.random() - 0.5) * 350; const y = getTerrainHeight(x, z); const rock = new THREE.Mesh(rockGeo, rockMat); rock.position.set(x, y + 0.5, z); rock.scale.set(1 + Math.random(), 1 + Math.random(), 1 + Math.random()); rock.rotation.set(Math.random(), Math.random(), Math.random()); rock.castShadow = true; scene.add(rock); obstacles.push({ x: x, z: z, radius: 1.0 }); } }
         
         function createDust() {
             if(!bikeVisuals) return; const exhaust = bikeVisuals.getObjectByName("exhaust"); if (!exhaust) return; if (Math.abs(speed) < 0.1) return;
@@ -511,12 +527,7 @@
             activeCameraMode = (activeCameraMode + 1) % 2; 
             const ind = document.getElementById('camera-indicator'); 
             let nextMode = (activeCameraMode + 1) % 2;
-            let label = "";
-            switch(nextMode) {
-                case 0: label = "CAM: ANGLED VIEW"; break;
-                case 1: label = "CAM: TOP VIEW"; break;
-            }
-            ind.innerText = label;
+            ind.innerText = nextMode === 0 ? "CAM: ANGLED VIEW" : "CAM: TOP VIEW";
         }
         
         function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
@@ -526,18 +537,14 @@
             const playerPos = bikeGroup.position;
             for(let i = rings.length - 1; i >= 0; i--) {
                 const ring = rings[i];
-                ring.rotation.y += 0.05; // Spin animation
+                ring.rotation.y += 0.05; 
                 const dx = playerPos.x - ring.position.x;
                 const dy = (playerPos.y + 0.5) - ring.position.y; 
                 const dz = playerPos.z - ring.position.z;
                 const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
 
                 if (dist < 2.0) {
-                    // Collect!
-                    scene.remove(ring);
-                    rings.splice(i, 1);
-                    sfx.playCollect();
-                    battery = Math.min(100, battery + RING_CHARGE);
+                    scene.remove(ring); rings.splice(i, 1); sfx.playCollect(); battery = Math.min(100, battery + RING_CHARGE);
                 }
             }
         }
@@ -548,20 +555,20 @@
                 if (battery < 0) battery = 0;
             }
             
-            // UI Update
             const bar = document.getElementById('battery-bar');
             const txt = document.getElementById('battery-text');
             bar.style.width = battery + "%";
             txt.innerText = "BATTERY: " + Math.round(battery) + "%";
             
-            // Speed Limit if Battery Low
             if (battery <= 0) {
-                speed *= 0.95; // Slow to stop
+                speed *= 0.95; 
             }
         }
 
         function animate(time) {
             requestAnimationFrame(animate);
+            if (!gameStarted) return;
+            
             if (time - lastTime >= 1000) { document.getElementById('fps').innerText = frameCount + " FPS"; frameCount = 0; lastTime = time; }
             frameCount++;
 
@@ -572,20 +579,12 @@
 
             if (battery > 0) { if (throttleInput > 0) speed += ACCEL * throttleInput; }
             if (throttleInput < 0) speed += ACCEL * throttleInput; 
-            
-            // BRAKE LOGIC
-            if (keys.brake) {
-                speed *= BRAKE_FRICTION; // Strong slow down
-            } else {
-                speed *= FRICTION; // Normal friction
-            }
+            if (keys.brake) speed *= BRAKE_FRICTION; else speed *= FRICTION; 
             
             let turnInput = 0; if (keys.a) turnInput += 1; if (keys.d) turnInput -= 1; turnInput += analogSteering; 
             if (bikeGroup && Math.abs(speed) > 0.05) bikeGroup.rotation.y += turnInput * TURN_SPEED;
 
-            // DRIFT LOGIC
             let isDrifting = false;
-            // Only drift if moving fast, turning, AND HOLDING BRAKE
             if (keys.brake && Math.abs(speed) > 0.3 && Math.abs(turnInput) > 0.3) {
                 isDrifting = true;
                 speed *= 0.99; 
@@ -602,19 +601,15 @@
 
                 if(isDrifting) {
                     const slideAmt = speed * turnInput * 0.08; 
-                    // Rotate Visuals relative to Group to show oversteer
                     if(bikeVisuals) bikeVisuals.rotation.y = -turnInput * 0.5;
-                    // Force slide movement perpendicular to forward
                     bikeGroup.translateX(-turnInput * slideAmt); 
                     if(frameCount % 3 === 0) createDust();
                 } else {
-                    // Return to straight visual
                     if(bikeVisuals) bikeVisuals.rotation.y *= 0.9;
                 }
 
-                if (checkCollisions(nextX, nextZ)) { 
-                    speed = -speed * 0.5; sfx.playLand(1.0); 
-                } else { 
+                if (checkCollisions(nextX, nextZ)) { speed = -speed * 0.5; sfx.playLand(1.0); } 
+                else { 
                     velocity.set(0, 0, speed); 
                     velocity.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y); 
                     bikeGroup.position.add(velocity); 
@@ -630,20 +625,7 @@
                 updateBattery();
 
                 const groundH = getTerrainHeight(bikeGroup.position.x, bikeGroup.position.z);
-                verticalVelocity -= GRAVITY; 
-                bikeGroup.position.y += verticalVelocity;
-
-                // REINFORCED GROUND CLAMP
-                if (bikeGroup.position.y < groundH) { 
-                    bikeGroup.position.y = groundH; 
-                    if (isAirborne) { sfx.playLand(Math.abs(verticalVelocity) * 2); isAirborne = false; } 
-                    verticalVelocity = 0; 
-                }
-                
-                // Force check
-                if (bikeGroup.position.y < groundH) {
-                    bikeGroup.position.y = groundH;
-                }
+                bikeGroup.position.y = groundH; 
 
                 const aheadV = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
                 const nextXPos = bikeGroup.position.x + aheadV.x; 
@@ -661,11 +643,11 @@
                 let lookOffset = new THREE.Vector3(0, 1, 0);
 
                 switch(activeCameraMode) {
-                    case 0: // Chase Standard
+                    case 0: 
                         camOffset.set(0, 4, -8);
                         camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
                         break;
-                    case 1: // Top Down (Relative)
+                    case 1: 
                         camOffset.set(0, 25, -2);
                         camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
                         break;
