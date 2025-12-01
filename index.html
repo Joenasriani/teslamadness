@@ -26,6 +26,7 @@
         }
         #canvas-container { width: 100vw; height: 100vh; display: block; }
         
+        /* LEFT HEADER UI */
         #ui-layer {
             position: absolute;
             top: max(20px, env(safe-area-inset-top)); 
@@ -34,22 +35,32 @@
             text-shadow: 2px 2px 0px #000;
             pointer-events: none;
             z-index: 10;
-            width: 300px;
+            /* Prevent overlap with right side */
+            width: auto;
+            max-width: 50%;
         }
         
-        h1 { margin: 0; font-size: clamp(16px, 4vw, 24px); letter-spacing: 2px; text-transform: uppercase; font-weight: bold; }
-        p { margin: 5px 0; font-size: clamp(10px, 3vw, 14px); color: #fff; }
+        h1 { 
+            margin: 0; 
+            font-size: clamp(14px, 4vw, 24px); /* Slightly smaller min size */
+            letter-spacing: 1px; 
+            text-transform: uppercase; 
+            font-weight: bold; 
+            white-space: nowrap; /* Keep title on one line if possible */
+        }
+        p { margin: 5px 0; font-size: clamp(9px, 2.5vw, 14px); color: #fff; }
         .accent { color: #00ff00; }
         .blink { animation: blinker 1.5s linear infinite; color: #ff00ff; }
         @keyframes blinker { 50% { opacity: 0; } }
 
         /* BATTERY BAR */
         .battery-container {
-            margin-top: 10px;
+            margin-top: 5px;
             width: 100%;
-            height: 15px;
+            max-width: 200px; /* Cap width */
+            height: 12px;
             background: rgba(0,0,0,0.5);
-            border: 2px solid #fff;
+            border: 1px solid #fff;
             position: relative;
         }
         #battery-bar {
@@ -60,11 +71,12 @@
         }
         #battery-text {
             position: absolute;
-            top: -20px; right: 0;
-            font-size: 12px;
+            top: -18px; right: 0;
+            font-size: clamp(9px, 2.5vw, 12px);
             color: #fff;
         }
         
+        /* RIGHT HEADER UI */
         .hud-stats {
             position: absolute;
             top: max(20px, env(safe-area-inset-top));
@@ -74,23 +86,26 @@
             z-index: 10;
             pointer-events: none;
             font-size: clamp(12px, 3.5vw, 16px);
+            max-width: 40%;
         }
 
+        /* CAMERA BUTTON (Moved down to avoid HUD overlap) */
         #camera-indicator {
             position: absolute;
-            top: max(60px, calc(env(safe-area-inset-top) + 40px));
+            top: max(70px, calc(env(safe-area-inset-top) + 50px)); /* Lower position */
             right: max(20px, env(safe-area-inset-right));
             background: rgba(0, 0, 0, 0.5);
             border: 2px solid #ffcc00;
-            padding: 5px 10px;
+            padding: 5px 8px;
             color: #ffcc00;
             font-weight: bold;
             text-transform: uppercase;
-            font-size: clamp(10px, 2.5vw, 12px);
+            font-size: clamp(9px, 2.5vw, 12px);
             pointer-events: auto; 
             cursor: pointer;
             z-index: 20;
             border-radius: 4px;
+            white-space: nowrap;
         }
 
         #loading {
@@ -175,21 +190,23 @@
         <div id="loading-text">LOADING ASSETS...</div>
     </div>
 
+    <!-- LEFT HEADER -->
     <div id="ui-layer">
         <h1>TESLA MADNESS '98</h1>
         <div class="battery-container">
             <div id="battery-bar"></div>
             <div id="battery-text">BATTERY: 100%</div>
         </div>
-        <p>COLLECT <span style="color:gold">GOLD RINGS</span> TO CHARGE</p>
+        <p>COLLECT <span style="color:gold">GOLD RINGS</span></p>
     </div>
 
-    <div id="camera-indicator">CAM: 3RD PERSON</div>
-
+    <!-- RIGHT HEADER -->
     <div class="hud-stats">
         <div id="speed">0 KM/H</div>
         <div id="fps">60 FPS</div>
     </div>
+    
+    <div id="camera-indicator">CAM: 3RD PERSON</div>
 
     <!-- CONTROLS -->
     <div class="touch-controls">
