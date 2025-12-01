@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Tesla Madness 1998 - Moto FBX</title>
+    <title>Tesla Madness 1998 - Mobile Controls</title>
     
     <script type="importmap">
     {
@@ -70,7 +70,7 @@
             border-radius: 4px;
         }
 
-        /* LOADING SCREEN STYLES */
+        /* LOADING SCREEN */
         #loading {
             position: absolute;
             top: 50%;
@@ -88,95 +88,130 @@
             text-align: center;
             box-shadow: 0 0 20px rgba(255, 204, 0, 0.2);
         }
+        .loading-title { color: white; font-size: clamp(16px, 4vw, 20px); margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
+        .progress-track { width: 100%; height: 20px; background: #222; border: 1px solid #555; margin-bottom: 10px; position: relative; }
+        #progress-bar { width: 0%; height: 100%; background: #ffcc00; transition: width 0.2s; }
+        #loading-text { color: #aaa; font-size: 12px; }
+        .error-msg { color: #ff3333 !important; }
 
-        .loading-title {
-            color: white;
-            font-size: clamp(16px, 4vw, 20px);
-            margin-bottom: 15px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .progress-track {
-            width: 100%;
-            height: 20px;
-            background: #222;
-            border: 1px solid #555;
-            margin-bottom: 10px;
-            position: relative;
-        }
-
-        #progress-bar {
-            width: 0%;
-            height: 100%;
-            background: #ffcc00;
-            transition: width 0.2s;
-        }
-
-        #loading-text {
-            color: #aaa;
-            font-size: 12px;
-        }
-        
-        .error-msg {
-            color: #ff3333 !important;
-        }
-
-        .touch-controls {
+        /* --- MOBILE CONTROLS --- */
+        #mobile-controls {
             position: absolute;
-            bottom: max(20px, env(safe-area-inset-bottom));
-            left: 0;
-            width: 100%;
-            height: auto;
+            top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none;
             z-index: 50;
-            display: flex;
-            justify-content: space-between;
-            padding-left: max(20px, env(safe-area-inset-left));
-            padding-right: max(20px, env(safe-area-inset-right));
-            box-sizing: border-box;
-            align-items: flex-end;
+            /* Hidden on desktop by default, shown via JS if touch detected or forced */
+            display: none; 
         }
 
-        .d-pad, .actions {
+        /* Show controls on touch devices */
+        @media (pointer: coarse) {
+            #mobile-controls { display: block; }
+        }
+
+        /* LEFT ZONE: JOYSTICK */
+        #joystick-zone {
+            position: absolute;
+            bottom: 0; left: 0;
+            width: 50%; height: 60%;
             pointer-events: auto;
-            display: flex;
-            gap: 15px;
-            align-items: flex-end;
+            touch-action: none;
         }
 
-        .btn {
-            background: rgba(255, 255, 255, 0.15);
-            border: 2px solid rgba(255, 204, 0, 0.5);
-            color: #ffcc00;
+        /* The Joystick UI (Created dynamically but styled here) */
+        .joystick-base {
+            position: absolute;
+            width: 120px; height: 120px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 204, 0, 0.3);
             border-radius: 50%;
-            width: clamp(50px, 15vw, 70px);
-            height: clamp(50px, 15vw, 70px);
+            transform: translate(-50%, -50%);
+            display: none; /* Hidden until touch */
+            pointer-events: none;
+        }
+        .joystick-knob {
+            position: absolute;
+            width: 50px; height: 50px;
+            background: rgba(255, 204, 0, 0.8);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            left: 50%; top: 50%;
+            box-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+        }
+
+        /* RIGHT ZONE: ACTIONS */
+        #action-zone {
+            position: absolute;
+            bottom: max(20px, env(safe-area-inset-bottom));
+            right: max(20px, env(safe-area-inset-right));
+            width: 40%; height: 40%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: row-reverse;
+            align-items: flex-end;
+            gap: 15px;
+        }
+
+        .control-btn {
+            pointer-events: auto;
+            background: rgba(255, 255, 255, 0.15);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            color: white;
+            font-weight: bold;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: clamp(18px, 5vw, 24px);
-            font-weight: bold;
-            touch-action: manipulation;
             user-select: none;
-            transition: background 0.1s, transform 0.05s;
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
+            touch-action: manipulation;
+            transition: transform 0.1s, background 0.1s;
         }
-
-        .btn:active, .btn.active {
+        .control-btn:active, .control-btn.active {
             background: rgba(255, 204, 0, 0.6);
-            color: #000;
+            border-color: #ffcc00;
             transform: scale(0.95);
+            color: black;
         }
 
-        .btn-rect { width: clamp(60px, 16vw, 80px); height: clamp(50px, 15vw, 70px); border-radius: 12px; font-size: clamp(12px, 3.5vw, 16px); }
-        .btn-large { width: clamp(70px, 18vw, 90px); height: clamp(70px, 18vw, 90px); font-size: clamp(12px, 3.5vw, 16px); border-color: #fff; background: rgba(255, 50, 50, 0.3); color: #fff; }
+        /* PEDAL SHAPES */
+        #btn-gas {
+            width: clamp(70px, 15vw, 90px);
+            height: clamp(120px, 25vw, 160px);
+            border-radius: 20px 20px 10px 10px;
+            font-size: 14px;
+            writing-mode: vertical-rl;
+            text-orientation: upright;
+        }
+        
+        #btn-brake {
+            width: clamp(80px, 18vw, 100px);
+            height: clamp(60px, 12vw, 80px);
+            border-radius: 10px;
+            margin-bottom: 0;
+            align-self: flex-end;
+            font-size: 14px;
+        }
 
-        @media (max-width: 600px) {
-            .touch-controls { flex-direction: row; align-items: flex-end; }
-            .d-pad, .actions { gap: 8px; }
-            .btn { border-width: 1.5px; }
+        #btn-jump {
+            position: absolute;
+            top: -20px;
+            right: 120px;
+            width: clamp(70px, 15vw, 90px);
+            height: clamp(70px, 15vw, 90px);
+            border-radius: 50%;
+            border-color: #ffcc00;
+            background: rgba(255, 50, 50, 0.2);
+            font-size: 12px;
+        }
+
+        /* Hint Text for Joystick */
+        .joystick-hint {
+            position: absolute;
+            bottom: 20px; left: 20px;
+            color: rgba(255,255,255,0.3);
+            font-size: 12px;
+            pointer-events: none;
         }
     </style>
 </head>
@@ -184,19 +219,18 @@
 
     <!-- LOADING SCREEN -->
     <div id="loading">
-        <div class="loading-title">LOADING ASSETS...</div>
+        <div class="loading-title">INITIALIZING SYSTEM...</div>
         <div class="progress-track">
             <div id="progress-bar"></div>
         </div>
-        <div id="loading-text">CONNECTING TO SERVER...</div>
+        <div id="loading-text">SEARCHING FOR ASSETS...</div>
     </div>
 
+    <!-- UI LAYER -->
     <div id="ui-layer">
         <h1>TESLA MADNESS '98</h1>
         <p>VEHICLE: <span class="accent">MOTO FBX</span> | PHYSICS: <span class="blink">ACTIVE</span></p>
         <p class="desktop-hint">KEYBOARD: WASD | SPACE</p>
-        <p class="mobile-hint">TOUCH: Controls Active</p>
-        <p style="color:#aaa; font-size:10px; margin-top:5px;">* TAP SCREEN TO START AUDIO *</p>
     </div>
 
     <div id="camera-indicator">CAM: 3RD PERSON</div>
@@ -206,15 +240,21 @@
         <div id="fps">60 FPS</div>
     </div>
 
-    <div class="touch-controls">
-        <div class="d-pad">
-            <div class="btn" id="btn-left">◄</div>
-            <div class="btn" id="btn-right">►</div>
+    <!-- MOBILE CONTROLS OVERLAY -->
+    <div id="mobile-controls">
+        <!-- Left: Virtual Joystick -->
+        <div id="joystick-zone">
+            <div class="joystick-hint">DRAG TO STEER</div>
+            <div class="joystick-base" id="joy-base">
+                <div class="joystick-knob" id="joy-knob"></div>
+            </div>
         </div>
-        <div class="actions">
-            <div class="btn btn-rect" id="btn-brake">BRAKE</div>
-            <div class="btn btn-rect" id="btn-gas">GAS</div>
-            <div class="btn btn-large" id="btn-jump">JUMP</div>
+
+        <!-- Right: Action Pedals -->
+        <div id="action-zone">
+            <div class="control-btn" id="btn-gas">GAS</div>
+            <div class="control-btn" id="btn-brake">BRAKE</div>
+            <div class="control-btn" id="btn-jump">JUMP</div>
         </div>
     </div>
 
@@ -236,11 +276,9 @@
         let isAirborne = false;
         let assetsLoaded = 0;
         let assetsTotal = 2; // Moto + Tree
+        let obstacles = [];
         
-        // Physics / Collision Arrays
-        let obstacles = []; // Stores {x, z, radius}
-        
-        // Loading Progress Variables
+        // Progress
         let progressMoto = 0;
         let progressTree = 0;
 
@@ -252,9 +290,104 @@
         const JUMP_FORCE = 0.8; 
         const MAP_LIMIT = 195; 
         
+        // Input State
         const keys = { w: false, a: false, s: false, d: false, space: false };
         let activeCameraMode = 1; 
+        let analogSteering = 0; // -1 (left) to 1 (right)
 
+        // --- JOYSTICK LOGIC ---
+        const joystick = {
+            active: false,
+            origin: { x: 0, y: 0 },
+            current: { x: 0, y: 0 },
+            maxDist: 50,
+            
+            init: function() {
+                const zone = document.getElementById('joystick-zone');
+                const base = document.getElementById('joy-base');
+                const knob = document.getElementById('joy-knob');
+
+                zone.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const touch = e.changedTouches[0];
+                    this.active = true;
+                    this.origin.x = touch.clientX;
+                    this.origin.y = touch.clientY;
+                    
+                    // Show Joystick at touch point
+                    base.style.display = 'block';
+                    base.style.left = this.origin.x + 'px';
+                    base.style.top = this.origin.y + 'px';
+                    knob.style.transform = `translate(-50%, -50%)`;
+                    
+                    sfx.init(); // Unlock Audio
+                }, { passive: false });
+
+                zone.addEventListener('touchmove', (e) => {
+                    if (!this.active) return;
+                    e.preventDefault();
+                    const touch = e.changedTouches[0];
+                    
+                    let dx = touch.clientX - this.origin.x;
+                    let dy = touch.clientY - this.origin.y;
+                    
+                    // Clamp distance
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    if (dist > this.maxDist) {
+                        const angle = Math.atan2(dy, dx);
+                        dx = Math.cos(angle) * this.maxDist;
+                        dy = Math.sin(angle) * this.maxDist;
+                    }
+
+                    // Move knob
+                    knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                    
+                    // Update Steering (-1 to 1)
+                    analogSteering = -(dx / this.maxDist);
+                }, { passive: false });
+
+                const end = (e) => {
+                    this.active = false;
+                    base.style.display = 'none';
+                    analogSteering = 0;
+                };
+                zone.addEventListener('touchend', end);
+                zone.addEventListener('touchcancel', end);
+            }
+        };
+
+        // --- BUTTON BINDINGS ---
+        function setupTouchControls() {
+            // Force display on mobile devices is handled by CSS @media (pointer: coarse)
+            // But we can force it for testing if needed
+            // document.getElementById('mobile-controls').style.display = 'block';
+
+            joystick.init();
+
+            const bindBtn = (id, key) => {
+                const btn = document.getElementById(id);
+                const start = (e) => {
+                    e.preventDefault();
+                    keys[key] = true;
+                    btn.classList.add('active');
+                    sfx.init();
+                    if(window.navigator.vibrate) window.navigator.vibrate(10);
+                };
+                const end = (e) => {
+                    e.preventDefault();
+                    keys[key] = false;
+                    btn.classList.remove('active');
+                };
+                btn.addEventListener('touchstart', start, { passive: false });
+                btn.addEventListener('touchend', end, { passive: false });
+            };
+
+            bindBtn('btn-gas', 'w');
+            bindBtn('btn-brake', 's');
+            bindBtn('btn-jump', 'space');
+        }
+
+        // --- AUDIO ENGINE ---
         const sfx = {
             ctx: null, engineOsc: null, engineGain: null, filter: null, noiseBuffer: null,
             init: function() {
@@ -373,7 +506,6 @@
         function loadModels() {
             const loader = new FBXLoader();
             
-            // 1. BIKE SETUP
             bikeGroup = new THREE.Group();
             scene.add(bikeGroup); 
 
@@ -381,9 +513,7 @@
             loader.load('fbx/moto.fbx', (object) => {
                 // SCALING: 50% smaller (0.005)
                 object.scale.set(0.005, 0.005, 0.005);
-                
-                // ROTATION: Back faces camera. Usually models face +Z or -Z.
-                // 180 degree rotation usually does the trick if it was facing wrong way.
+                // ROTATION: Back faces camera.
                 object.rotation.y = Math.PI; 
 
                 object.traverse((child) => {
@@ -404,7 +534,7 @@
                      progressMoto = 50; updateProgress();
                 }
             }, (error) => {
-                console.warn("Moto FBX missing. Using Box fallback.");
+                console.warn("Moto FBX missing.");
                 reportError("moto.fbx");
                 createFallbackBike();
                 assetsLoaded++;
@@ -417,7 +547,6 @@
                 const dummy = new THREE.Object3D();
                 const transforms = [];
                 
-                // Generate positions and store for collision
                 for(let i=0; i<count; i++) {
                     const x = (Math.random() - 0.5) * 200;
                     const z = (Math.random() - 0.5) * 200;
@@ -432,8 +561,7 @@
                     dummy.updateMatrix();
                     transforms.push(dummy.matrix.clone());
 
-                    // ADD COLLISION OBSTACLE
-                    obstacles.push({ x: x, z: z, radius: 1.5 }); // Tree collision radius
+                    obstacles.push({ x: x, z: z, radius: 1.5 });
                 }
 
                 object.traverse((child) => {
@@ -456,7 +584,7 @@
                      progressTree = 50; updateProgress();
                 }
             }, (err) => {
-                console.warn("Tree FBX missing. Using Cone fallback.");
+                console.warn("Tree FBX missing.");
                 reportError("Tree.fbx");
                 createFallbackTrees();
                 assetsLoaded++;
@@ -487,7 +615,6 @@
                  const mesh = new THREE.Mesh(geo, mat);
                  mesh.position.set(x, y+2, z);
                  scene.add(mesh);
-                 // Add collision for fallbacks too
                  obstacles.push({ x: x, z: z, radius: 1.5 });
             }
         }
@@ -505,24 +632,6 @@
                     document.getElementById('loading').style.display = 'none';
                 }, 500);
             }
-        }
-
-        function setupTouchControls() {
-            const bindTouch = (id, key) => {
-                const el = document.getElementById(id);
-                const start = (e) => { e.preventDefault(); keys[key] = true; el.classList.add('active'); sfx.init(); };
-                const end = (e) => { e.preventDefault(); keys[key] = false; el.classList.remove('active'); };
-                el.addEventListener('touchstart', start, { passive: false });
-                el.addEventListener('touchend', end, { passive: false });
-                el.addEventListener('mousedown', start);
-                el.addEventListener('mouseup', end);
-                el.addEventListener('mouseleave', end);
-            };
-            bindTouch('btn-left', 'a');
-            bindTouch('btn-right', 'd');
-            bindTouch('btn-gas', 'w');
-            bindTouch('btn-brake', 's');
-            bindTouch('btn-jump', 'space');
         }
 
         function createTerrain() {
@@ -584,7 +693,6 @@
                 const angle = Math.random() * Math.PI * 2; const rad = 120 + Math.random() * 80;
                 const x = Math.cos(angle) * rad; const z = Math.sin(angle) * rad; const y = getTerrainHeight(x, z) + 6;
                 const bb = new THREE.Mesh(billboardGeo, billboardMat); bb.position.set(x,y,z); scene.add(bb); billboardTrees.push(bb);
-                // No collision for far away billboards
             }
         }
 
@@ -672,13 +780,19 @@
             if (time - lastTime >= 1000) { document.getElementById('fps').innerText = frameCount + " FPS"; frameCount = 0; lastTime = time; }
             frameCount++;
 
+            // Acceleration
             if (keys.w) speed += ACCEL;
             if (keys.s) speed -= ACCEL;
             speed *= FRICTION;
             
+            // Turning (Mix keyboard and analog)
+            let turnInput = 0;
+            if (keys.a) turnInput += 1;
+            if (keys.d) turnInput -= 1;
+            turnInput += analogSteering; 
+
             if (bikeGroup && Math.abs(speed) > 0.05) {
-                if (keys.a) bikeGroup.rotation.y += TURN_SPEED;
-                if (keys.d) bikeGroup.rotation.y -= TURN_SPEED;
+                bikeGroup.rotation.y += turnInput * TURN_SPEED;
             }
 
             if (bikeGroup) {
@@ -727,9 +841,9 @@
                 const angle = Math.atan2(nextH - groundH, 1.0);
                 bikeGroup.rotation.x = THREE.MathUtils.lerp(bikeGroup.rotation.x, -angle, 0.1);
                 
-                if (keys.a) bikeGroup.rotation.z = Math.min(bikeGroup.rotation.z + 0.05, 0.3);
-                else if (keys.d) bikeGroup.rotation.z = Math.max(bikeGroup.rotation.z - 0.05, -0.3);
-                else bikeGroup.rotation.z *= 0.9; 
+                // Roll based on turn
+                const targetRoll = turnInput * 0.3;
+                bikeGroup.rotation.z = THREE.MathUtils.lerp(bikeGroup.rotation.z, targetRoll, 0.1);
 
                 const targetPos = bikeGroup.position.clone();
                 if (activeCameraMode === 1) {
