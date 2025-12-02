@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cybertruck Madness 1998 - SFX Control</title>
+    <title>Cybertruck Madness 1998 - Physics Update</title>
     
     <script type="importmap">
     {
@@ -53,8 +53,6 @@
         }
         p { margin: 5px 0; font-size: clamp(9px, 2.5vw, 14px); color: #fff; }
         .accent { color: #00ff00; }
-        .blink { animation: blinker 1.5s linear infinite; color: #ff00ff; }
-        @keyframes blinker { 50% { opacity: 0; } }
 
         /* BATTERY BAR */
         .battery-container {
@@ -287,13 +285,15 @@
         let scene, camera, renderer;
         let bikeGroup, terrainMesh;
         let speed = 0;
+        let lateralVelocity = 0; // NEW: Track sideways drift speed
+        let lastTurnInput = 0;   // NEW: Track steering change for snap-oversteer
+        
         let velocity = new THREE.Vector3();
         let verticalVelocity = 0; 
         let particles = [];
         let rings = []; 
         let frameCount = 0;
         let lastTime = 0;
-        let isAirborne = false;
         let assetsLoaded = 0;
         let assetsTotal = 2; 
         let obstacles = [];
@@ -491,7 +491,6 @@
                 this.filter.frequency.setTargetAtTime(200 + (speedPercent * 3000), this.ctx.currentTime, 0.1);
 
                 if(isSkidding) {
-                    // REDUCED SKID VOLUME TO 0.06 (60% less than previous 0.15)
                     this.skidGain.gain.setTargetAtTime(0.06, this.ctx.currentTime, 0.1);
                     this.skidOsc.frequency.setTargetAtTime(150 + Math.random()*100, this.ctx.currentTime, 0.1);
                 } else {
@@ -630,6 +629,8 @@
                         const instancedMesh = new THREE.InstancedMesh(child.geometry, child.material, count);
                         instancedMesh.castShadow = true;
                         instancedMesh.receiveShadow = true;
+                        // DISABLED FRUSTUM CULLING TO PREVENT INVISIBLE WALLS
+                        instancedMesh.frustumCulled = false;
                         for(let i=0; i<count; i++) instancedMesh.setMatrixAt(i, transforms[i]);
                         instancedMesh.instanceMatrix.needsUpdate = true;
                         scene.add(instancedMesh);
@@ -658,6 +659,11 @@
             const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
             const leafGeo = BufferGeometryUtils.mergeGeometries([leaves1, leaves2, leaves3]);
             const leafMesh = new THREE.InstancedMesh(leafGeo, leafMat, count);
+            
+            // DISABLED FRUSTUM CULLING TO PREVENT INVISIBLE WALLS
+            trunkMesh.frustumCulled = false;
+            leafMesh.frustumCulled = false;
+
             trunkMesh.castShadow = true; trunkMesh.receiveShadow = true;
             leafMesh.castShadow = true; leafMesh.receiveShadow = true;
             for(let i=0; i<count; i++) {
@@ -723,13 +729,13 @@
             for(let i=0; i< 30; i++) { const x = (Math.random() - 0.5) * 350; const z = (Math.random() - 0.5) * 350; const y = getTerrainHeight(x, z); const rock = new THREE.Mesh(rockGeo, rockMat); rock.position.set(x, y + 0.5, z); rock.scale.set(1 + Math.random(), 1 + Math.random(), 1 + Math.random()); rock.rotation.set(Math.random(), Math.random(), Math.random()); rock.castShadow = true; scene.add(rock); obstacles.push({ x: x, z: z, radius: 1.0 }); }
         }
         
-        function createDriftSmoke() {
+        function createDriftSmoke(intensity) {
             if(!bikeGroup) return; 
             // Create smoke at rear wheel position
             const offset = new THREE.Vector3(0, 0.2, 0.5); // Slightly behind center
             offset.applyMatrix4(bikeGroup.matrixWorld);
             
-            const geo = new THREE.DodecahedronGeometry(0.3, 0);
+            const geo = new THREE.DodecahedronGeometry(0.3 * Math.min(intensity * 3, 2.0), 0);
             const mat = new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.6 });
             const p = new THREE.Mesh(geo, mat);
             
@@ -743,8 +749,8 @@
             if(p.position.y < gH) p.position.y = gH + 0.1;
             
             scene.add(p);
-            // Drift smoke lasts longer and grows bigger
-            particles.push({ mesh: p, life: 1.5, isSmoke: true });
+            // Drift smoke lasts longer and grows bigger based on intensity
+            particles.push({ mesh: p, life: 1.5 + intensity, isSmoke: true });
         }
 
         function createDust() {
@@ -840,31 +846,57 @@
             
             let turnInput = 0; if (keys.a) turnInput += 1; if (keys.d) turnInput -= 1; turnInput += analogSteering; 
 
-            // DRIFT LOGIC
-            let isDrifting = false;
-            if (Math.abs(speed) > 0.3 && Math.abs(turnInput) > 0.1 && keys.brake) {
-                isDrifting = true;
-            }
+            // --- ADVANCED DRIFT PHYSICS 2.0 ---
+            
+            // 1. Calculate how quickly the player is changing direction (Initiation Snap)
+            // If previous input was 0 and now is 1, delta is 1. 
+            // If switching from -1 to 1, delta is 2 (Huge snap).
+            const turnDelta = Math.abs(turnInput - lastTurnInput);
+            lastTurnInput = turnInput;
 
-            // BRAKE PHYSICS
-            if (keys.brake) {
-                if (isDrifting) {
-                     // Handbrake drift: Less speed loss (sliding) but sharp turning
-                     speed *= 0.97; 
-                } else {
-                     // Normal straight line braking
-                     speed *= BRAKE_FRICTION; 
-                }
+            let isDrifting = false;
+
+            // 2. Drift Initiation Logic
+            // Needs speed (> 0.3) AND Brake held.
+            if (keys.brake && Math.abs(speed) > 0.3) {
+                isDrifting = true;
+                
+                // PHYSICS: Centrifugal Force
+                // F = mv^2/r. The faster you go, the more you want to slide out.
+                // We square the speed so entering fast results in a HUGE slide.
+                const centrifugalFactor = (speed * speed) * turnInput; 
+                
+                // PHYSICS: Initiation "Kick"
+                // If you snap the steering (high turnDelta), you upset the balance more.
+                // This simulates the "Scandinavian Flick".
+                const kickFactor = turnDelta * speed * 2.0 * Math.sign(turnInput);
+                
+                // Add these forces to our lateral velocity.
+                // We multiply by 0.1 to scale it to frame-by-frame physics.
+                lateralVelocity += (centrifugalFactor + kickFactor) * 0.15;
+                
+                // VISUALS: Oversteer
+                // When drifting, the car rotates faster than it actually changes direction.
+                bikeGroup.rotation.y += turnInput * 0.09; 
+                
+                // Slightly preserve speed (Slide instead of stop)
+                speed *= 0.97;
             } else {
-                speed *= FRICTION; // Normal rolling friction
+                isDrifting = false;
+                // Normal Braking (if not drifting)
+                if(keys.brake) speed *= BRAKE_FRICTION;
+                
+                // Regain Traction: Lateral velocity decays quickly when not drifting
+                lateralVelocity *= 0.85; 
+                
+                // Normal Turning
+                if (Math.abs(speed) > 0.05) bikeGroup.rotation.y += turnInput * TURN_SPEED;
             }
             
-            // APPLY TURNING
-            if (bikeGroup && Math.abs(speed) > 0.05) {
-                // If drifting, we turn significantly faster visually (Oversteer)
-                let effectiveTurnSpeed = TURN_SPEED * (isDrifting ? 2.5 : 1.0);
-                bikeGroup.rotation.y += turnInput * effectiveTurnSpeed;
-            }
+            if(!keys.brake) speed *= FRICTION; // Rolling resistance
+
+            // Apply Lateral Friction (Tires resisting slide)
+            lateralVelocity *= 0.96;
 
             if (bikeGroup) {
                 const nextVel = new THREE.Vector3(0, 0, speed); 
@@ -872,13 +904,18 @@
                 const nextX = bikeGroup.position.x + nextVel.x; 
                 const nextZ = bikeGroup.position.z + nextVel.z;
 
-                if(isDrifting) {
-                    // SLIDE PHYSICS: Move perpendicular to the turn
-                    // If turning Left (+), nose points Left, inertia carries Right
-                    const slidePower = 0.2; 
-                    bikeGroup.translateX(turnInput * speed * slidePower);
-                    
-                    if(frameCount % 2 === 0) createDriftSmoke(); 
+                // APPLY LATERAL SLIDE
+                // We slide along the local X axis. 
+                // Note: lateralVelocity is signed based on turnInput (Left Turn + -> Slide Right +)
+                // We actually want the car to slide "out" of the turn.
+                // If turning Left (+ rotation), centrifugal force pushes Right (- local X? No, + local X depends on mesh orientation).
+                // Let's assume standard ThreeJS: +X is Right.
+                // Left Turn (Positive Rot) -> Push Right (Positive X)
+                bikeGroup.translateX(lateralVelocity);
+
+                // Create Smoke if sliding hard
+                if (Math.abs(lateralVelocity) > 0.05 && frameCount % 3 === 0) {
+                    createDriftSmoke(Math.abs(lateralVelocity));
                 }
 
                 if (checkCollisions(nextX, nextZ)) { 
@@ -889,10 +926,11 @@
                     bikeGroup.position.add(velocity); 
                 }
 
-                if (bikeGroup.position.x > MAP_LIMIT) { bikeGroup.position.x = MAP_LIMIT; speed = 0; }
-                if (bikeGroup.position.x < -MAP_LIMIT) { bikeGroup.position.x = -MAP_LIMIT; speed = 0; }
-                if (bikeGroup.position.z > MAP_LIMIT) { bikeGroup.position.z = MAP_LIMIT; speed = 0; }
-                if (bikeGroup.position.z < -MAP_LIMIT) { bikeGroup.position.z = -MAP_LIMIT; speed = 0; }
+                // REMOVED "speed = 0" SO WALLS ARE LESS JARRING
+                if (bikeGroup.position.x > MAP_LIMIT) { bikeGroup.position.x = MAP_LIMIT; }
+                if (bikeGroup.position.x < -MAP_LIMIT) { bikeGroup.position.x = -MAP_LIMIT; }
+                if (bikeGroup.position.z > MAP_LIMIT) { bikeGroup.position.z = MAP_LIMIT; }
+                if (bikeGroup.position.z < -MAP_LIMIT) { bikeGroup.position.z = -MAP_LIMIT; }
 
                 sfx.updateEngine(Math.abs(speed), isDrifting);
                 checkRings();
