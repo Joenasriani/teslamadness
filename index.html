@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Tesla Madness 1998 - SFX Control</title>
+    <title>Tesla Madness 1998 - Drift Master Edition</title>
     
     <script type="importmap">
     {
@@ -96,6 +96,26 @@
             flex-direction: column;
             align-items: flex-end;
             gap: 8px;
+        }
+
+        /* DRIFT INDICATOR */
+        #drift-indicator {
+            color: #ff6600;
+            font-weight: bold;
+            text-shadow: 2px 2px 0 #000;
+            font-size: clamp(10px, 3vw, 14px);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #drift-indicator.active {
+            opacity: 1;
+            animation: pulse-drift 0.5s infinite alternate;
+        }
+
+        @keyframes pulse-drift {
+            0% { transform: scale(1); color: #ff6600; }
+            100% { transform: scale(1.1); color: #ffaa00; }
         }
 
         /* HUD BUTTONS */
@@ -207,22 +227,33 @@
             box-shadow: 0 0 15px rgba(255, 204, 0, 0.6);
         }
 
-        /* RED BRAKE BUTTON VISUAL */
+        /* HANDBRAKE BUTTON VISUAL */
         #brake-visual .touch-feedback-knob {
             width: 90px; height: 90px;
-            background: rgba(255, 50, 50, 0.6);
-            border: 2px solid #ff3333;
-            box-shadow: 0 0 20px rgba(255, 0, 0, 0.4);
+            background: rgba(255, 100, 50, 0.8);
+            border: 2px solid #ff6600;
+            box-shadow: 0 0 20px rgba(255, 100, 0, 0.6);
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
             font-weight: bold;
-            font-size: 14px;
+            font-size: 12px;
         }
         
         #brake-visual .touch-feedback-knob::after {
-            content: "BRAKE";
+            content: "HANDBRAKE";
+        }
+
+        /* TIRE SMOKE PARTICLES */
+        .tire-smoke {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(150, 150, 150, 0.8);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 1;
         }
 
     </style>
@@ -230,7 +261,7 @@
 <body>
 
     <div id="loading">
-        <div class="loading-title">CHARGING BATTERIES...</div>
+        <div class="loading-title">CHARGING CYBERTRUCK...</div>
         <div class="progress-track">
             <div id="progress-bar"></div>
         </div>
@@ -239,17 +270,19 @@
 
     <!-- LEFT HEADER -->
     <div id="ui-layer">
-        <h1>TESLA MADNESS '98</h1>
+        <h1>TESLA CYBERTRUCK DRIFT</h1>
         <div class="battery-container">
             <div id="battery-bar"></div>
             <div id="battery-text">BATTERY: 100%</div>
         </div>
         <p>COLLECT <span style="color:gold">GOLD RINGS</span></p>
+        <p>HANDBRAKE + TURN = <span class="accent">SLIDE</span></p>
     </div>
 
     <!-- RIGHT HEADER -->
     <div class="hud-stats">
         <div id="speed">0 KM/H</div>
+        <div id="drift-indicator">🔥 SLIDING 🔥</div>
         <div id="fps">60 FPS</div>
         
         <!-- BUTTONS -->
@@ -268,9 +301,9 @@
             </div>
         </div>
         
-        <!-- RIGHT: BRAKE/DRIFT -->
+        <!-- RIGHT: HANDBRAKE -->
         <div id="brake-zone" class="control-zone">
-            <div class="zone-hint hint-right">HOLD TO DRIFT</div>
+            <div class="zone-hint hint-right">HANDBRAKE DRIFT</div>
             <div class="touch-feedback-base" id="brake-visual">
                 <div class="touch-feedback-knob"></div>
             </div>
@@ -288,6 +321,7 @@
         let bikeGroup, terrainMesh;
         let speed = 0;
         let velocity = new THREE.Vector3();
+        let lateralVelocity = new THREE.Vector3(); // For handbrake sliding
         let verticalVelocity = 0; 
         let particles = [];
         let rings = []; 
@@ -298,7 +332,7 @@
         let assetsTotal = 2; 
         let obstacles = [];
         
-        let progressMoto = 0;
+        let progressCyber = 0;
         let progressTree = 0;
 
         // GAMEPLAY STATS
@@ -306,13 +340,24 @@
         const BATTERY_DRAIN = 0.05; 
         const RING_CHARGE = 20;
 
-        const MAX_SPEED = 1.2;
-        const ACCEL = 0.02;
-        const FRICTION = 0.98;
-        const BRAKE_FRICTION = 0.92; 
-        const TURN_SPEED = 0.04;
+        // ENHANCED PHYSICS CONSTANTS
+        const MAX_SPEED = 1.6; // Higher max speed for more excitement
+        const ACCEL = 0.03; // Faster acceleration
+        const FRICTION = 0.988; // Very smooth deceleration when coasting
+        const TURN_SPEED = 0.05; // Enhanced turning
         const GRAVITY = 0.04; 
         const MAP_LIMIT = 195; 
+        
+        // HANDBRAKE DRIFT PHYSICS CONSTANTS
+        const HANDBRAKE_SLIDE_FORCE = 0.25; // Strong lateral slide force
+        const LATERAL_FRICTION = 0.92; // How lateral momentum decays
+        const HANDBRAKE_FORWARD_RETENTION = 0.95; // Keep most forward speed during handbrake
+        const MIN_DRIFT_SPEED = 0.4; // Minimum speed needed for effective drift
+        const SLIDE_AMPLIFICATION = 1.8; // Amplify slide effect at higher speeds
+        
+        let isDriftActive = false;
+        let driftIntensity = 0.0;
+        let handbrakeHeld = false;
         
         const keys = { w: false, a: false, s: false, d: false, space: false, brake: false };
         
@@ -320,7 +365,7 @@
         let analogSteering = 0;
         let analogThrottle = 0; 
 
-        // --- CONTROLS LOGIC ---
+        // --- ENHANCED CONTROLS LOGIC ---
         const controls = {
             init: function() {
                 // JOYSTICK (LEFT)
@@ -377,7 +422,7 @@
                 joyZone.addEventListener('touchend', endJoy);
                 joyZone.addEventListener('touchcancel', endJoy);
 
-                // DYNAMIC BRAKE (RIGHT)
+                // HANDBRAKE (RIGHT)
                 const brakeZone = document.getElementById('brake-zone');
                 const brakeVisual = document.getElementById('brake-visual');
 
@@ -385,8 +430,9 @@
                     e.preventDefault();
                     const touch = e.changedTouches[0];
                     keys.brake = true;
+                    handbrakeHeld = true;
                     sfx.init(); sfx.playMusic();
-                    if(window.navigator.vibrate) window.navigator.vibrate(10);
+                    if(window.navigator.vibrate) window.navigator.vibrate([20, 10, 20]); // Stronger haptic for handbrake
 
                     const rect = brakeZone.getBoundingClientRect();
                     const x = touch.clientX - rect.left;
@@ -400,6 +446,7 @@
                 const endBrake = (e) => {
                     e.preventDefault();
                     keys.brake = false;
+                    handbrakeHeld = false;
                     brakeVisual.style.display = 'none';
                 };
                 brakeZone.addEventListener('touchend', endBrake);
@@ -407,9 +454,23 @@
             }
         };
 
+        // ENHANCED AUDIO SYSTEM
         const sfx = {
-            ctx: null, engineOsc: null, engineGain: null, filter: null, noiseBuffer: null, skidOsc: null, skidGain: null, 
-            bgm: null, isMusicOn: true, isSfxOn: true,
+            ctx: null, 
+            // Engine sounds
+            engineOsc: null, engineOsc2: null, engineGain: null, engineFilter: null,
+            // Tire/drift sounds
+            skidOsc: null, skidGain: null, skidFilter: null,
+            // Wind sound
+            windOsc: null, windGain: null, windFilter: null,
+            // Noise buffer for various effects
+            noiseBuffer: null, 
+            // Music
+            bgm: null, 
+            // States
+            isMusicOn: true, isSfxOn: true,
+            // Audio smoothing
+            smoothSpeed: 0, smoothDrift: 0,
             
             init: function() {
                 if (this.ctx) {
@@ -418,30 +479,94 @@
                 }
                 const AC = window.AudioContext || window.webkitAudioContext;
                 this.ctx = new AC();
-                const bufferSize = this.ctx.sampleRate * 2; 
-                this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-                const data = this.noiseBuffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
                 
-                this.engineOsc = this.ctx.createOscillator(); this.engineOsc.type = 'triangle'; this.engineOsc.frequency.value = 60;
-                this.engineGain = this.ctx.createGain(); this.engineGain.gain.value = 0;
-                this.filter = this.ctx.createBiquadFilter(); this.filter.type = 'lowpass'; this.filter.frequency.value = 400;
-                this.engineOsc.connect(this.filter); this.filter.connect(this.engineGain); this.engineGain.connect(this.ctx.destination);
+                // Create high-quality noise buffer
+                const bufferSize = this.ctx.sampleRate * 3; 
+                this.noiseBuffer = this.ctx.createBuffer(2, bufferSize, this.ctx.sampleRate);
+                for(let channel = 0; channel < 2; channel++) {
+                    const data = this.noiseBuffer.getChannelData(channel);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = (Math.random() * 2 - 1) * 0.8;
+                    }
+                }
+                
+                // ENHANCED ENGINE SOUND - Cybertruck electric motor simulation
+                this.engineOsc = this.ctx.createOscillator(); 
+                this.engineOsc.type = 'triangle'; // Smoother for electric motor
+                this.engineOsc.frequency.value = 35; // Lower base frequency
+                
+                this.engineOsc2 = this.ctx.createOscillator();
+                this.engineOsc2.type = 'sine'; // Pure tone for electric whine
+                this.engineOsc2.frequency.value = 70;
+                
+                this.engineGain = this.ctx.createGain(); 
+                this.engineGain.gain.value = 0;
+                
+                this.engineFilter = this.ctx.createBiquadFilter(); 
+                this.engineFilter.type = 'lowpass'; 
+                this.engineFilter.frequency.value = 250;
+                this.engineFilter.Q.value = 1.5;
+                
+                // Connect engine chain
+                const engineMix = this.ctx.createGain();
+                engineMix.gain.value = 0.8;
+                const engineMix2 = this.ctx.createGain();
+                engineMix2.gain.value = 0.2;
+                
+                this.engineOsc.connect(engineMix);
+                this.engineOsc2.connect(engineMix2);
+                engineMix.connect(this.engineFilter);
+                engineMix2.connect(this.engineFilter);
+                this.engineFilter.connect(this.engineGain);
+                this.engineGain.connect(this.ctx.destination);
+                
                 this.engineOsc.start();
+                this.engineOsc2.start();
 
+                // ENHANCED TIRE SCREECH for handbrake slides
                 this.skidOsc = this.ctx.createOscillator();
                 this.skidOsc.type = 'sawtooth';
                 this.skidOsc.frequency.value = 150;
+                
                 this.skidGain = this.ctx.createGain();
                 this.skidGain.gain.value = 0;
-                this.skidOsc.connect(this.skidGain);
+                
+                this.skidFilter = this.ctx.createBiquadFilter();
+                this.skidFilter.type = 'bandpass';
+                this.skidFilter.frequency.value = 1200;
+                this.skidFilter.Q.value = 12.0; // Very sharp for intense screech
+                
+                this.skidOsc.connect(this.skidFilter);
+                this.skidFilter.connect(this.skidGain);
                 this.skidGain.connect(this.ctx.destination);
                 this.skidOsc.start();
 
-                // Music Setup
+                // HIGH-SPEED WIND
+                this.windOsc = this.ctx.createOscillator();
+                this.windOsc.type = 'sawtooth';
+                this.windOsc.frequency.value = 50;
+                
+                this.windGain = this.ctx.createGain();
+                this.windGain.gain.value = 0;
+                
+                this.windFilter = this.ctx.createBiquadFilter();
+                this.windFilter.type = 'highpass';
+                this.windFilter.frequency.value = 180;
+                
+                this.windOsc.connect(this.windFilter);
+                this.windFilter.connect(this.windGain);
+                this.windGain.connect(this.ctx.destination);
+                this.windOsc.start();
+
+                // Cybertruck Music
                 this.bgm = new Audio('music/cybertruck.mp3');
                 this.bgm.loop = true;
-                this.bgm.volume = 0.6;
+                this.bgm.volume = 0.35; // Balanced for enhanced SFX
+                this.bgm.crossOrigin = "anonymous";
+                
+                this.bgm.addEventListener('canplay', () => {
+                    if(this.isMusicOn) this.bgm.play().catch(e => {});
+                });
             },
             
             playMusic: function() {
@@ -454,7 +579,7 @@
                 this.isMusicOn = !this.isMusicOn;
                 const btn = document.getElementById('music-indicator');
                 if (this.isMusicOn) {
-                    if(this.bgm) this.bgm.play();
+                    if(this.bgm) this.bgm.play().catch(e => {});
                     btn.innerText = "MUSIC: ON";
                     btn.classList.remove('off');
                 } else {
@@ -473,66 +598,136 @@
                 } else {
                     btn.innerText = "SFX: OFF";
                     btn.classList.add('off');
-                    // Mute current loops immediately
                     if(this.engineGain) this.engineGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
                     if(this.skidGain) this.skidGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+                    if(this.windGain) this.windGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
                 }
             },
 
-            updateEngine: function(speedPercent, isSkidding) {
+            // ENHANCED AUDIO UPDATE for electric Cybertruck
+            updateEngine: function(speedPercent, driftIntensity) {
                 if (!this.ctx || !this.isSfxOn) return;
 
-                this.engineOsc.frequency.setTargetAtTime(60 + (speedPercent * 300), this.ctx.currentTime, 0.1);
-                const vol = (0.05 + (speedPercent * 0.1)) * 0.3; 
-                this.engineGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.1);
-                this.filter.frequency.setTargetAtTime(200 + (speedPercent * 3000), this.ctx.currentTime, 0.1);
+                this.smoothSpeed = THREE.MathUtils.lerp(this.smoothSpeed, speedPercent, 0.08);
+                this.smoothDrift = THREE.MathUtils.lerp(this.smoothDrift, driftIntensity, 0.12);
 
-                if(isSkidding) {
-                    // REDUCED SKID VOLUME TO 0.06 (60% less than previous 0.15)
-                    this.skidGain.gain.setTargetAtTime(0.06, this.ctx.currentTime, 0.1);
-                    this.skidOsc.frequency.setTargetAtTime(150 + Math.random()*100, this.ctx.currentTime, 0.1);
+                // Electric motor whine (higher pitch at speed)
+                const baseFreq = 35 + (this.smoothSpeed * this.smoothSpeed * 200);
+                const harmFreq = baseFreq * 2.0;
+
+                this.engineOsc.frequency.setTargetAtTime(baseFreq, this.ctx.currentTime, 0.04);
+                this.engineOsc2.frequency.setTargetAtTime(harmFreq, this.ctx.currentTime, 0.06);
+
+                // Cybertruck motor volume curve
+                const engineVol = 0.015 + (this.smoothSpeed * 0.08) + (this.smoothSpeed * this.smoothSpeed * 0.06);
+                this.engineGain.gain.setTargetAtTime(engineVol, this.ctx.currentTime, 0.08);
+
+                // Filter sweep for electric motor character
+                const filterFreq = 180 + (this.smoothSpeed * 1800) + (this.smoothDrift * 600);
+                this.engineFilter.frequency.setTargetAtTime(filterFreq, this.ctx.currentTime, 0.08);
+
+                // INTENSE HANDBRAKE SCREECH
+                if(this.smoothDrift > 0.15) {
+                    const skidVol = Math.min(this.smoothDrift * 0.35, 0.28); // Louder for dramatic effect
+                    this.skidGain.gain.setTargetAtTime(skidVol, this.ctx.currentTime, 0.03);
+                    
+                    // Varying screech for realism
+                    const skidFreq = 150 + (Math.random() * 120) + (this.smoothDrift * 80);
+                    this.skidOsc.frequency.setTargetAtTime(skidFreq, this.ctx.currentTime, 0.04);
+                    
+                    // Dynamic filter sweep for tire screech character
+                    const skidFilterFreq = 800 + (this.smoothDrift * 1600) + (Math.random() * 600);
+                    this.skidFilter.frequency.setTargetAtTime(skidFilterFreq, this.ctx.currentTime, 0.06);
                 } else {
-                    this.skidGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
+                    this.skidGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.15);
+                }
+
+                // Wind noise at high speed
+                if(this.smoothSpeed > 0.65) {
+                    const windVol = (this.smoothSpeed - 0.65) * 0.12;
+                    this.windGain.gain.setTargetAtTime(windVol, this.ctx.currentTime, 0.25);
+                    
+                    const windFreq = 50 + (this.smoothSpeed * 35) + (Math.random() * 15);
+                    this.windOsc.frequency.setTargetAtTime(windFreq, this.ctx.currentTime, 0.18);
+                } else {
+                    this.windGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.4);
                 }
             },
             
             playLand: function(intensity) {
                 if (!this.ctx || !this.isSfxOn) return;
-                const src = this.ctx.createBufferSource(); src.buffer = this.noiseBuffer;
-                const gain = this.ctx.createGain(); gain.gain.setValueAtTime(Math.min(intensity * 0.5, 0.5), this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
-                const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(600, this.ctx.currentTime); filter.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.2);
-                src.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
-                src.start(); src.stop(this.ctx.currentTime + 0.3);
+                const src = this.ctx.createBufferSource(); 
+                src.buffer = this.noiseBuffer;
+                
+                const gain = this.ctx.createGain(); 
+                const startVol = Math.min(intensity * 0.25, 0.35);
+                gain.gain.setValueAtTime(startVol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.35);
+                
+                const filter = this.ctx.createBiquadFilter(); 
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(350, this.ctx.currentTime); 
+                filter.frequency.exponentialRampToValueAtTime(70, this.ctx.currentTime + 0.25);
+                
+                src.connect(filter); 
+                filter.connect(gain); 
+                gain.connect(this.ctx.destination);
+                src.start(); 
+                src.stop(this.ctx.currentTime + 0.35);
             },
+
             playCollect: function() {
                 if (!this.ctx || !this.isSfxOn) return;
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
+                
                 osc.type = 'sine';
-                osc.frequency.setValueAtTime(800, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
-                osc.connect(gain); gain.connect(this.ctx.destination);
-                osc.start(); osc.stop(this.ctx.currentTime + 0.5);
+                osc.frequency.setValueAtTime(700, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1600, this.ctx.currentTime + 0.12);
+                osc.frequency.exponentialRampToValueAtTime(900, this.ctx.currentTime + 0.35);
+                
+                gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.55);
+                
+                osc.connect(gain); 
+                gain.connect(this.ctx.destination);
+                osc.start(); 
+                osc.stop(this.ctx.currentTime + 0.55);
             }
         };
 
         function init() {
             const container = document.getElementById('canvas-container');
-            scene = new THREE.Scene(); scene.background = new THREE.Color(0x87CEEB); scene.fog = new THREE.Fog(0xdcb183, 20, 200); 
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            renderer = new THREE.WebGLRenderer({ antialias: true, highp: true });
+            scene = new THREE.Scene(); 
+            scene.background = new THREE.Color(0x87CEEB); 
+            scene.fog = new THREE.Fog(0xdcb183, 15, 250); 
+            
+            camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
-            renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+            renderer.shadowMap.enabled = true; 
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping; 
+            renderer.toneMappingExposure = 1.3;
             container.appendChild(renderer.domElement);
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); scene.add(ambientLight);
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1.5); dirLight.position.set(50, 100, 50); dirLight.castShadow = true;
-            dirLight.shadow.mapSize.width = 4096; dirLight.shadow.mapSize.height = 4096; dirLight.shadow.bias = -0.0001;
+
+            // Enhanced lighting for Cybertruck
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); 
+            scene.add(ambientLight);
+            
+            const dirLight = new THREE.DirectionalLight(0xffffff, 2.0); 
+            dirLight.position.set(40, 120, 60); 
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 4096; 
+            dirLight.shadow.mapSize.height = 4096; 
+            dirLight.shadow.bias = -0.0002;
+            dirLight.shadow.camera.near = 1;
+            dirLight.shadow.camera.far = 400;
+            dirLight.shadow.camera.left = -120;
+            dirLight.shadow.camera.right = 120;
+            dirLight.shadow.camera.top = 120;
+            dirLight.shadow.camera.bottom = -120;
             scene.add(dirLight);
 
             createTerrain();
@@ -557,7 +752,7 @@
         }
 
         function updateProgress() {
-            const total = Math.round((progressMoto + progressTree) / 2);
+            const total = Math.round((progressCyber + progressTree) / 2);
             const bar = document.getElementById('progress-bar');
             const text = document.getElementById('loading-text');
             if(bar) bar.style.width = total + "%";
@@ -570,17 +765,21 @@
         }
 
         function createRings() {
-            const geo = new THREE.TorusGeometry(0.8, 0.15, 8, 16);
+            const geo = new THREE.TorusGeometry(0.9, 0.18, 8, 16);
             const mat = new THREE.MeshStandardMaterial({ 
-                color: 0xFFFF00, metalness: 0.1, roughness: 0.2, emissive: 0xFFFF00, emissiveIntensity: 0.8
+                color: 0xFFFF00, 
+                metalness: 0.2, 
+                roughness: 0.1, 
+                emissive: 0xFFFF00, 
+                emissiveIntensity: 0.9
             });
 
-            for(let i=0; i<20; i++) {
+            for(let i=0; i<25; i++) {
                 const ring = new THREE.Mesh(geo, mat);
-                const x = (Math.random() - 0.5) * 300;
-                const z = (Math.random() - 0.5) * 300;
+                const x = (Math.random() - 0.5) * 320;
+                const z = (Math.random() - 0.5) * 320;
                 const y = getTerrainHeight(x, z);
-                ring.position.set(x, y + 0.2, z); 
+                ring.position.set(x, y + 0.3, z); 
                 ring.rotation.y = Math.random() * Math.PI;
                 ring.castShadow = true;
                 scene.add(ring);
@@ -590,37 +789,62 @@
 
         function loadModels() {
             const loader = new FBXLoader();
-            bikeGroup = new THREE.Group(); scene.add(bikeGroup); 
+            bikeGroup = new THREE.Group(); 
+            scene.add(bikeGroup); 
 
-            // 1. Load Moto
-            loader.load('fbx/moto.fbx', (object) => {
-                object.scale.set(0.005, 0.005, 0.005);
+            // 1. Load Cybertruck.fbx
+            loader.load('Cybertruck.fbx', (object) => {
+                object.scale.set(0.008, 0.008, 0.008); // Slightly larger for better presence
                 object.rotation.y = 0; 
-                object.traverse((child) => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
+                object.traverse((child) => { 
+                    if (child.isMesh) { 
+                        child.castShadow = true; 
+                        child.receiveShadow = true; 
+                        // Cybertruck materials
+                        if(child.material) {
+                            child.material.metalness = 0.8; // High metalness for steel body
+                            child.material.roughness = 0.2; // Smooth steel finish
+                        }
+                    } 
+                });
                 bikeGroup.add(object);
                 addExhaust();
+                addTireSmoke();
                 assetsLoaded++;
                 checkLoading();
-            }, (xhr) => { if (xhr.lengthComputable) { progressMoto = (xhr.loaded / xhr.total) * 100; updateProgress(); } else { progressMoto = 50; updateProgress(); }
-            }, (error) => { console.warn("Moto FBX missing."); reportError("moto.fbx"); createFallbackBike(); assetsLoaded++; checkLoading(); });
+            }, (xhr) => { 
+                if (xhr.lengthComputable) { 
+                    progressCyber = (xhr.loaded / xhr.total) * 100; 
+                    updateProgress(); 
+                } else { 
+                    progressCyber = 60; 
+                    updateProgress(); 
+                }
+            }, (error) => { 
+                console.warn("Cybertruck.fbx missing."); 
+                reportError("Cybertruck.fbx"); 
+                createFallbackCybertruck(); 
+                assetsLoaded++; 
+                checkLoading(); 
+            });
 
-            // 2. Load FBX Tree (Increased count from 40 to 80)
+            // 2. Load FBX Tree
             loader.load('fbx/Tree.fbx', (object) => {
-                const count = 80; 
+                const count = 90; 
                 const dummy = new THREE.Object3D();
                 const transforms = [];
                 for(let i=0; i<count; i++) {
-                    const x = (Math.random() - 0.5) * 200;
-                    const z = (Math.random() - 0.5) * 200;
-                    if (Math.abs(x) < 20 && Math.abs(z) < 20) { i--; continue; } 
+                    const x = (Math.random() - 0.5) * 220;
+                    const z = (Math.random() - 0.5) * 220;
+                    if (Math.abs(x) < 25 && Math.abs(z) < 25) { i--; continue; } 
                     const y = getTerrainHeight(x, z);
-                    const s = 0.015 * (0.8 + Math.random() * 0.5); 
+                    const s = 0.016 * (0.7 + Math.random() * 0.6); 
                     dummy.position.set(x, y, z);
                     dummy.rotation.set(0, Math.random() * Math.PI * 2, 0); 
                     dummy.scale.set(s, s, s);
                     dummy.updateMatrix();
                     transforms.push(dummy.matrix.clone());
-                    obstacles.push({ x: x, z: z, radius: 1.5 });
+                    obstacles.push({ x: x, z: z, radius: 1.6 });
                 }
                 object.traverse((child) => {
                     if (child.isMesh) {
@@ -634,98 +858,325 @@
                 });
                 assetsLoaded++;
                 checkLoading();
-            }, (xhr) => { if (xhr.lengthComputable) { progressTree = (xhr.loaded / xhr.total) * 100; updateProgress(); } else { progressTree = 50; updateProgress(); }
-            }, (err) => { console.warn("Tree FBX missing."); reportError("Tree.fbx"); createFallbackTrees(); assetsLoaded++; checkLoading(); });
+            }, (xhr) => { 
+                if (xhr.lengthComputable) { 
+                    progressTree = (xhr.loaded / xhr.total) * 100; 
+                    updateProgress(); 
+                } else { 
+                    progressTree = 50; 
+                    updateProgress(); 
+                }
+            }, (err) => { 
+                console.warn("Tree FBX missing."); 
+                reportError("Tree.fbx"); 
+                createFallbackTrees(); 
+                assetsLoaded++; 
+                checkLoading(); 
+            });
 
             createProceduralPines();
             createRocks();
-            // Removed createFences call
         }
 
         function createProceduralPines() {
-            const trunkGeo = new THREE.CylinderGeometry(0.2, 0.4, 1.5, 5); trunkGeo.translate(0, 0.75, 0);
-            const leaves1 = new THREE.ConeGeometry(1.2, 1.5, 5); leaves1.translate(0, 2.0, 0);
-            const leaves2 = new THREE.ConeGeometry(0.9, 1.2, 5); leaves2.translate(0, 2.8, 0);
-            const leaves3 = new THREE.ConeGeometry(0.6, 1.0, 5); leaves3.translate(0, 3.5, 0);
-            // Increased count from 40 to 80
-            const count = 80;
+            const trunkGeo = new THREE.CylinderGeometry(0.25, 0.45, 1.8, 6); 
+            trunkGeo.translate(0, 0.9, 0);
+            const leaves1 = new THREE.ConeGeometry(1.4, 1.8, 6); 
+            leaves1.translate(0, 2.2, 0);
+            const leaves2 = new THREE.ConeGeometry(1.0, 1.4, 6); 
+            leaves2.translate(0, 3.0, 0);
+            const leaves3 = new THREE.ConeGeometry(0.7, 1.1, 6); 
+            leaves3.translate(0, 3.8, 0);
+            
+            const count = 85;
             const dummy = new THREE.Object3D();
-            const trunkMat = new THREE.MeshStandardMaterial({color: 0x3d2817});
-            const leafMat = new THREE.MeshStandardMaterial({color: 0x1a472a});
+            const trunkMat = new THREE.MeshStandardMaterial({color: 0x2d1f0f, roughness: 0.95});
+            const leafMat = new THREE.MeshStandardMaterial({color: 0x0f3d1f, roughness: 0.85});
             const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
             const leafGeo = BufferGeometryUtils.mergeGeometries([leaves1, leaves2, leaves3]);
             const leafMesh = new THREE.InstancedMesh(leafGeo, leafMat, count);
-            trunkMesh.castShadow = true; trunkMesh.receiveShadow = true;
-            leafMesh.castShadow = true; leafMesh.receiveShadow = true;
+            
+            trunkMesh.castShadow = true; 
+            trunkMesh.receiveShadow = true;
+            leafMesh.castShadow = true; 
+            leafMesh.receiveShadow = true;
+            
             for(let i=0; i<count; i++) {
-                const x = (Math.random() - 0.5) * 300; const z = (Math.random() - 0.5) * 300;
-                if(Math.abs(x) < 20 && Math.abs(z) < 20) { i--; continue; }
-                const y = getTerrainHeight(x, z); const s = 1.0 + Math.random() * 0.5;
-                dummy.position.set(x, y, z); dummy.rotation.y = Math.random() * Math.PI; dummy.scale.set(s,s,s); dummy.updateMatrix();
-                trunkMesh.setMatrixAt(i, dummy.matrix); leafMesh.setMatrixAt(i, dummy.matrix);
-                obstacles.push({x:x, z:z, radius: 1.0});
+                const x = (Math.random() - 0.5) * 340; 
+                const z = (Math.random() - 0.5) * 340;
+                if(Math.abs(x) < 25 && Math.abs(z) < 25) { i--; continue; }
+                const y = getTerrainHeight(x, z); 
+                const s = 0.9 + Math.random() * 0.7;
+                dummy.position.set(x, y, z); 
+                dummy.rotation.y = Math.random() * Math.PI; 
+                dummy.scale.set(s,s,s); 
+                dummy.updateMatrix();
+                trunkMesh.setMatrixAt(i, dummy.matrix); 
+                leafMesh.setMatrixAt(i, dummy.matrix);
+                obstacles.push({x:x, z:z, radius: 1.2});
             }
-            scene.add(trunkMesh); scene.add(leafMesh);
+            scene.add(trunkMesh); 
+            scene.add(leafMesh);
         }
 
-        function createFallbackBike() {
-            const geo = new THREE.BoxGeometry(0.5, 0.5, 1); const mat = new THREE.MeshStandardMaterial({color: 0xff0000}); const mesh = new THREE.Mesh(geo, mat); mesh.position.y = 0.5; bikeGroup.add(mesh); addExhaust();
+        function createFallbackCybertruck() {
+            // Angular Cybertruck-like shape
+            const bodyGeo = new THREE.BoxGeometry(1.2, 0.6, 2.2); 
+            const bodyMat = new THREE.MeshStandardMaterial({
+                color: 0xc0c0c0, 
+                metalness: 0.8, 
+                roughness: 0.2
+            }); 
+            const body = new THREE.Mesh(bodyGeo, bodyMat); 
+            body.position.set(0, 0.8, 0);
+            
+            // Cybertruck cab
+            const cabGeo = new THREE.BoxGeometry(1.0, 0.8, 1.0);
+            const cab = new THREE.Mesh(cabGeo, bodyMat);
+            cab.position.set(0, 1.2, 0.3);
+            
+            bikeGroup.add(body);
+            bikeGroup.add(cab);
+            addExhaust();
+            addTireSmoke();
         }
+
         function createFallbackTrees() {
-            const geo = new THREE.ConeGeometry(1, 4, 8); const mat = new THREE.MeshStandardMaterial({color: 0x00ff00});
-            for(let i=0; i<30; i++) { const x = (Math.random() - 0.5) * 200; const z = (Math.random() - 0.5) * 200; const y = getTerrainHeight(x, z); const mesh = new THREE.Mesh(geo, mat); mesh.position.set(x, y+2, z); scene.add(mesh); obstacles.push({ x: x, z: z, radius: 1.5 }); }
+            const geo = new THREE.ConeGeometry(1.2, 4.5, 8); 
+            const mat = new THREE.MeshStandardMaterial({color: 0x1a472a});
+            for(let i=0; i<35; i++) { 
+                const x = (Math.random() - 0.5) * 220; 
+                const z = (Math.random() - 0.5) * 220; 
+                const y = getTerrainHeight(x, z); 
+                const mesh = new THREE.Mesh(geo, mat); 
+                mesh.position.set(x, y+2.2, z); 
+                scene.add(mesh); 
+                obstacles.push({ x: x, z: z, radius: 1.5 }); 
+            }
         }
-        function addExhaust() { const exhaustPoint = new THREE.Object3D(); exhaustPoint.position.set(0, 0.5, -1.2); exhaustPoint.name = "exhaust"; bikeGroup.add(exhaustPoint); }
-        function checkLoading() { 
-            if (assetsLoaded >= assetsTotal) { 
-                sfx.init(); sfx.playMusic();
-                setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 500); 
-            } 
+
+        function addExhaust() { 
+            const exhaustPoint = new THREE.Object3D(); 
+            exhaustPoint.position.set(0, 0.4, -1.5); 
+            exhaustPoint.name = "exhaust"; 
+            bikeGroup.add(exhaustPoint); 
+        }
+
+        function addTireSmoke() {
+            // Cybertruck tire positions
+            const leftRear = new THREE.Object3D();
+            leftRear.position.set(-0.6, 0.2, -0.8);
+            leftRear.name = "leftRear";
+            bikeGroup.add(leftRear);
+
+            const rightRear = new THREE.Object3D();
+            rightRear.position.set(0.6, 0.2, -0.8);
+            rightRear.name = "rightRear";
+            bikeGroup.add(rightRear);
         }
         
-        function setupTouchControls() {
-            joystick.init();
-            const bindBtn = (id, key) => {
-                const btn = document.getElementById(id);
-                const start = (e) => { e.preventDefault(); keys[key] = true; btn.classList.add('active'); sfx.init(); sfx.playMusic(); if(window.navigator.vibrate) window.navigator.vibrate(10); };
-                const end = (e) => { e.preventDefault(); keys[key] = false; btn.classList.remove('active'); };
-                btn.addEventListener('touchstart', start, { passive: false }); btn.addEventListener('touchend', end, { passive: false });
-            };
-            // No buttons anymore, just zones
+        function checkLoading() { 
+            if (assetsLoaded >= assetsTotal) { 
+                sfx.init(); 
+                sfx.playMusic();
+                setTimeout(() => { 
+                    document.getElementById('loading').style.display = 'none'; 
+                }, 600); 
+            } 
         }
 
         function createTerrain() {
-            const geometry = new THREE.PlaneGeometry(400, 400, 400, 400); geometry.rotateX(-Math.PI / 2); const positions = geometry.attributes.position.array;
+            const geometry = new THREE.PlaneGeometry(450, 450, 450, 450); 
+            geometry.rotateX(-Math.PI / 2); 
+            const positions = geometry.attributes.position.array;
+            
             for (let i = 0; i < positions.length; i += 3) {
-                const x = positions[i]; const z = positions[i + 2];
-                const y = (Math.sin(x * 0.03) * 5) + (Math.cos(z * 0.03) * 5) + (Math.sin(x * 0.1 + z * 0.1) * 1.5) + (Math.random() * 0.2);
-                const dist = Math.sqrt(x*x + z*z); let bowl = 0; if(dist > 100) bowl = (dist - 100) * 0.15; positions[i + 1] = y + bowl;
+                const x = positions[i]; 
+                const z = positions[i + 2];
+                const y = (Math.sin(x * 0.025) * 6) + (Math.cos(z * 0.025) * 6) + (Math.sin(x * 0.08 + z * 0.08) * 2) + (Math.random() * 0.3);
+                const dist = Math.sqrt(x*x + z*z); 
+                let bowl = 0; 
+                if(dist > 120) bowl = (dist - 120) * 0.12; 
+                positions[i + 1] = y + bowl;
             }
             geometry.computeVertexNormals();
-            const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 1024; const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#8B5A2B'; ctx.fillRect(0,0,1024,1024);
-            for(let i=0; i<50000; i++) {
-                const shade = Math.random(); if(shade > 0.6) ctx.fillStyle = '#A07040'; else if (shade > 0.3) ctx.fillStyle = '#5C4033'; else ctx.fillStyle = '#556B2F';
-                const x = Math.random() * 1024; const y = Math.random() * 1024; const size = Math.random() * 3 + 1; ctx.fillRect(x, y, size, size);
+            
+            // Enhanced dirt terrain
+            const canvas = document.createElement('canvas'); 
+            canvas.width = 1024; 
+            canvas.height = 1024; 
+            const ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = '#8B5A2B'; 
+            ctx.fillRect(0,0,1024,1024);
+            
+            // More detailed texture
+            for(let i=0; i<60000; i++) {
+                const shade = Math.random(); 
+                if(shade > 0.75) ctx.fillStyle = '#B07040'; 
+                else if (shade > 0.5) ctx.fillStyle = '#5C4033'; 
+                else if (shade > 0.25) ctx.fillStyle = '#556B2F';
+                else ctx.fillStyle = '#704214';
+                
+                const x = Math.random() * 1024; 
+                const y = Math.random() * 1024; 
+                const size = Math.random() * 4 + 0.5; 
+                ctx.fillRect(x, y, size, size);
             }
-            const tex = new THREE.CanvasTexture(canvas); tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(10, 10);
-            const material = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 });
-            terrainMesh = new THREE.Mesh(geometry, material); terrainMesh.receiveShadow = true; scene.add(terrainMesh);
+            
+            const tex = new THREE.CanvasTexture(canvas); 
+            tex.wrapS = THREE.RepeatWrapping; 
+            tex.wrapT = THREE.RepeatWrapping; 
+            tex.repeat.set(12, 12);
+            
+            const material = new THREE.MeshStandardMaterial({ 
+                map: tex, 
+                roughness: 0.95,
+                metalness: 0.0
+            });
+            
+            terrainMesh = new THREE.Mesh(geometry, material); 
+            terrainMesh.receiveShadow = true; 
+            scene.add(terrainMesh);
         }
 
-        function getTerrainHeight(x, z) { const raycaster = new THREE.Raycaster(); raycaster.set(new THREE.Vector3(x, 100, z), new THREE.Vector3(0, -1, 0)); const intersects = raycaster.intersectObject(terrainMesh); return intersects.length > 0 ? intersects[0].point.y : 0; }
+        function getTerrainHeight(x, z) { 
+            const raycaster = new THREE.Raycaster(); 
+            raycaster.set(new THREE.Vector3(x, 100, z), new THREE.Vector3(0, -1, 0)); 
+            const intersects = raycaster.intersectObject(terrainMesh); 
+            return intersects.length > 0 ? intersects[0].point.y : 0; 
+        }
         
         function createRocks() {
-             const rockGeo = new THREE.DodecahedronGeometry(1, 0); const rockMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.9 });
-            for(let i=0; i< 30; i++) { const x = (Math.random() - 0.5) * 350; const z = (Math.random() - 0.5) * 350; const y = getTerrainHeight(x, z); const rock = new THREE.Mesh(rockGeo, rockMat); rock.position.set(x, y + 0.5, z); rock.scale.set(1 + Math.random(), 1 + Math.random(), 1 + Math.random()); rock.rotation.set(Math.random(), Math.random(), Math.random()); rock.castShadow = true; scene.add(rock); obstacles.push({ x: x, z: z, radius: 1.0 }); }
+            const rockGeo = new THREE.DodecahedronGeometry(1.2, 0); 
+            const rockMat = new THREE.MeshStandardMaterial({ 
+                color: 0x555555, 
+                roughness: 0.95,
+                metalness: 0.05 
+            });
+            
+            for(let i=0; i< 40; i++) { 
+                const x = (Math.random() - 0.5) * 380; 
+                const z = (Math.random() - 0.5) * 380; 
+                const y = getTerrainHeight(x, z); 
+                const rock = new THREE.Mesh(rockGeo, rockMat); 
+                rock.position.set(x, y + 0.6, z); 
+                rock.scale.set(0.8 + Math.random(), 0.8 + Math.random(), 0.8 + Math.random()); 
+                rock.rotation.set(Math.random(), Math.random(), Math.random()); 
+                rock.castShadow = true; 
+                scene.add(rock); 
+                obstacles.push({ x: x, z: z, radius: 1.1 }); 
+            }
         }
         
         function createDust() {
-            if(!bikeGroup) return; const exhaust = bikeGroup.getObjectByName("exhaust"); if (!exhaust) return; if (Math.abs(speed) < 0.1) return;
-            const pos = new THREE.Vector3(); exhaust.getWorldPosition(pos); const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2); const mat = new THREE.MeshBasicMaterial({ color: 0x8b7e66, transparent: true, opacity: 0.4 }); const p = new THREE.Mesh(geo, mat); p.position.copy(pos); p.position.x += (Math.random() - 0.5) * 0.3; const gH = getTerrainHeight(pos.x, pos.z); if(p.position.y < gH) p.position.y = gH + 0.2; scene.add(p); particles.push({ mesh: p, life: 1.0 });
+            if(!bikeGroup) return; 
+            const exhaust = bikeGroup.getObjectByName("exhaust"); 
+            if (!exhaust) return; 
+            if (Math.abs(speed) < 0.15) return;
+            
+            const pos = new THREE.Vector3(); 
+            exhaust.getWorldPosition(pos); 
+            const geo = new THREE.BoxGeometry(0.12, 0.12, 0.12); 
+            const mat = new THREE.MeshBasicMaterial({ 
+                color: 0x9b8e76, 
+                transparent: true, 
+                opacity: 0.25
+            }); 
+            const p = new THREE.Mesh(geo, mat); 
+            p.position.copy(pos); 
+            p.position.x += (Math.random() - 0.5) * 0.5; 
+            p.position.z += (Math.random() - 0.5) * 0.3;
+            
+            const gH = getTerrainHeight(pos.x, pos.z); 
+            if(p.position.y < gH) p.position.y = gH + 0.15; 
+            
+            scene.add(p); 
+            particles.push({ 
+                mesh: p, 
+                life: 1.2,
+                velocity: new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.025,
+                    0.008 + Math.random() * 0.025,
+                    (Math.random() - 0.5) * 0.025
+                )
+            });
         }
-        function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { const p = particles[i]; p.life -= 0.02; p.mesh.position.y += 0.02; p.mesh.scale.multiplyScalar(1.05); p.mesh.material.opacity = p.life * 0.4; p.mesh.rotation.x += 0.1; if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); } } }
-        function onKey(e, pressed) { const k = e.key.toLowerCase(); if (k === 'w' || k === 'arrowup') keys.w = pressed; if (k === 's' || k === 'arrowdown') keys.s = pressed; if (k === 'a' || k === 'arrowleft') keys.a = pressed; if (k === 'd' || k === 'arrowright') keys.d = pressed; if (k === ' ') keys.space = pressed; }
+
+        function createTireSmoke() {
+            if(!bikeGroup || !isDriftActive) return;
+            
+            const leftRear = bikeGroup.getObjectByName("leftRear");
+            const rightRear = bikeGroup.getObjectByName("rightRear");
+            
+            [leftRear, rightRear].forEach(tire => {
+                if(!tire) return;
+                
+                const pos = new THREE.Vector3();
+                tire.getWorldPosition(pos);
+                
+                // More intense smoke during handbrake slides
+                for(let i = 0; i < 3; i++) {
+                    const geo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
+                    const mat = new THREE.MeshBasicMaterial({
+                        color: 0xaaaaaa,
+                        transparent: true,
+                        opacity: 0.7
+                    });
+                    
+                    const p = new THREE.Mesh(geo, mat);
+                    p.position.copy(pos);
+                    p.position.x += (Math.random() - 0.5) * 0.4;
+                    p.position.z += (Math.random() - 0.5) * 0.4;
+                    p.position.y += Math.random() * 0.15;
+                    
+                    scene.add(p);
+                    particles.push({
+                        mesh: p,
+                        life: 0.9,
+                        velocity: new THREE.Vector3(
+                            (Math.random() - 0.5) * 0.04,
+                            0.015 + Math.random() * 0.025,
+                            (Math.random() - 0.5) * 0.04
+                        ),
+                        isTireSmoke: true
+                    });
+                }
+            });
+        }
+
+        function updateParticles() { 
+            for (let i = particles.length - 1; i >= 0; i--) { 
+                const p = particles[i]; 
+                p.life -= p.isTireSmoke ? 0.025 : 0.018; 
+                
+                if(p.velocity) {
+                    p.mesh.position.add(p.velocity);
+                    p.velocity.multiplyScalar(0.97);
+                } else {
+                    p.mesh.position.y += 0.015; 
+                }
+                
+                p.mesh.scale.multiplyScalar(1.025); 
+                p.mesh.material.opacity = p.life * (p.isTireSmoke ? 0.7 : 0.25); 
+                p.mesh.rotation.x += 0.08; 
+                p.mesh.rotation.z += 0.04;
+                
+                if (p.life <= 0) { 
+                    scene.remove(p.mesh); 
+                    particles.splice(i, 1); 
+                } 
+            } 
+        }
+
+        function onKey(e, pressed) { 
+            const k = e.key.toLowerCase(); 
+            if (k === 'w' || k === 'arrowup') keys.w = pressed; 
+            if (k === 's' || k === 'arrowdown') keys.s = pressed; 
+            if (k === 'a' || k === 'arrowleft') keys.a = pressed; 
+            if (k === 'd' || k === 'arrowright') keys.d = pressed; 
+            if (k === ' ') { keys.space = pressed; handbrakeHeld = pressed; }
+        }
         
         function switchCamera() { 
             activeCameraMode = (activeCameraMode + 1) % 2; 
@@ -733,27 +1184,44 @@
             let nextMode = (activeCameraMode + 1) % 2;
             let label = "";
             switch(nextMode) {
-                case 0: label = "CAM: ANGLED VIEW"; break;
+                case 0: label = "CAM: CHASE VIEW"; break;
                 case 1: label = "CAM: TOP VIEW"; break;
             }
             ind.innerText = label;
         }
         
-        function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
-        function checkCollisions(newX, newZ) { const bikeRadius = 0.5; for(let obs of obstacles) { const dx = newX - obs.x; const dz = newZ - obs.z; const dist = Math.sqrt(dx*dx + dz*dz); if (dist < (bikeRadius + obs.radius)) return true; } return false; }
+        function onWindowResize() { 
+            camera.aspect = window.innerWidth / window.innerHeight; 
+            camera.updateProjectionMatrix(); 
+            renderer.setSize(window.innerWidth, window.innerHeight); 
+        }
+
+        function checkCollisions(newX, newZ) { 
+            const bikeRadius = 0.7; // Larger for Cybertruck
+            for(let obs of obstacles) { 
+                const dx = newX - obs.x; 
+                const dz = newZ - obs.z; 
+                const dist = Math.sqrt(dx*dx + dz*dz); 
+                if (dist < (bikeRadius + obs.radius)) return true; 
+            } 
+            return false; 
+        }
 
         function checkRings() {
             const playerPos = bikeGroup.position;
             for(let i = rings.length - 1; i >= 0; i--) {
                 const ring = rings[i];
-                ring.rotation.y += 0.05; // Spin animation
+                ring.rotation.y += 0.04; 
                 const dx = playerPos.x - ring.position.x;
-                const dy = (playerPos.y + 0.5) - ring.position.y; 
+                const dy = (playerPos.y + 0.8) - ring.position.y; 
                 const dz = playerPos.z - ring.position.z;
                 const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
 
-                if (dist < 2.0) {
-                    scene.remove(ring); rings.splice(i, 1); sfx.playCollect(); battery = Math.min(100, battery + RING_CHARGE);
+                if (dist < 2.2) {
+                    scene.remove(ring); 
+                    rings.splice(i, 1); 
+                    sfx.playCollect(); 
+                    battery = Math.min(100, battery + RING_CHARGE);
                 }
             }
         }
@@ -764,21 +1232,23 @@
                 if (battery < 0) battery = 0;
             }
             
-            // UI Update
             const bar = document.getElementById('battery-bar');
             const txt = document.getElementById('battery-text');
             bar.style.width = battery + "%";
             txt.innerText = "BATTERY: " + Math.round(battery) + "%";
             
-            // Speed Limit if Battery Low
             if (battery <= 0) {
-                speed *= 0.95; // Slow to stop
+                speed *= 0.94; 
             }
         }
 
         function animate(time) {
             requestAnimationFrame(animate);
-            if (time - lastTime >= 1000) { document.getElementById('fps').innerText = frameCount + " FPS"; frameCount = 0; lastTime = time; }
+            if (time - lastTime >= 1000) { 
+                document.getElementById('fps').innerText = frameCount + " FPS"; 
+                frameCount = 0; 
+                lastTime = time; 
+            }
             frameCount++;
 
             let throttleInput = 0;
@@ -786,105 +1256,175 @@
             if (keys.s) throttleInput -= 1;
             if (Math.abs(analogThrottle) > 0.1) throttleInput += analogThrottle;
 
-            if (battery > 0) { if (throttleInput > 0) speed += ACCEL * throttleInput; }
-            if (throttleInput < 0) speed += ACCEL * throttleInput; 
+            // Normal acceleration (no speed reduction from handbrake)
+            if (battery > 0) { 
+                if (throttleInput > 0) speed += ACCEL * throttleInput; 
+            }
+            if (throttleInput < 0) speed += ACCEL * throttleInput * 0.8; // Reverse slightly slower
             
-            // BRAKE LOGIC
-            if (keys.brake) {
-                speed *= BRAKE_FRICTION; // Strong slow down
+            let turnInput = 0; 
+            if (keys.a) turnInput += 1; 
+            if (keys.d) turnInput -= 1; 
+            turnInput += analogSteering;
+
+            // HANDBRAKE SLIDE PHYSICS
+            const absSpeed = Math.abs(speed);
+            const speedPercent = Math.min(absSpeed / MAX_SPEED, 1.0);
+            
+            // Handbrake behavior: maintain forward speed, add lateral slide
+            if (handbrakeHeld && absSpeed > MIN_DRIFT_SPEED && Math.abs(turnInput) > 0.2) {
+                isDriftActive = true;
+                driftIntensity = Math.min(driftIntensity + 0.08, 1.0);
+                
+                // KEEP forward momentum (key difference!)
+                speed *= HANDBRAKE_FORWARD_RETENTION; // Only slight forward speed loss
+                
+                // Add strong lateral slide based on turn input and speed
+                const slideAmount = turnInput * HANDBRAKE_SLIDE_FORCE * (1 + speedPercent * SLIDE_AMPLIFICATION);
+                const slideDir = new THREE.Vector3(-1, 0, 0); 
+                slideDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
+                slideDir.multiplyScalar(slideAmount);
+                
+                // Accumulate lateral velocity for sustained slides
+                lateralVelocity.add(slideDir);
+                lateralVelocity.multiplyScalar(LATERAL_FRICTION); // Gradual decay
+                
             } else {
-                speed *= FRICTION; // Normal friction
-            }
-            
-            let turnInput = 0; if (keys.a) turnInput += 1; if (keys.d) turnInput -= 1; turnInput += analogSteering; 
-            if (bikeGroup && Math.abs(speed) > 0.05) bikeGroup.rotation.y += turnInput * TURN_SPEED;
-
-            // DRIFT LOGIC
-            let isDrifting = false;
-            if (Math.abs(speed) > 0.4 && Math.abs(turnInput) > 0.5 && keys.brake) {
-                isDrifting = true;
+                // End handbrake slide
+                isDriftActive = false;
+                driftIntensity = Math.max(driftIntensity - 0.12, 0.0);
+                
+                // Normal coasting friction when not handbraking
+                speed *= FRICTION;
+                lateralVelocity.multiplyScalar(0.85); // Faster lateral decay when not sliding
             }
 
-            if (bikeGroup) {
-                const nextVel = new THREE.Vector3(0, 0, speed); 
-                nextVel.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                const nextX = bikeGroup.position.x + nextVel.x; 
-                const nextZ = bikeGroup.position.z + nextVel.z;
+            // Update drift UI
+            const driftIndicator = document.getElementById('drift-indicator');
+            if (isDriftActive && driftIntensity > 0.25) {
+                driftIndicator.classList.add('active');
+            } else {
+                driftIndicator.classList.remove('active');
+            }
 
-                if(isDrifting) {
-                    const slideAmt = speed * turnInput * 0.08; // Stronger drift
-                    bikeGroup.rotation.y += turnInput * 0.05; 
-                    bikeGroup.translateX(-slideAmt); 
-                    if(frameCount % 3 === 0) createDust(); 
-                }
+            if (bikeGroup && Math.abs(speed) > 0.05) {
+                // Normal turning (still applies during handbrake)
+                bikeGroup.rotation.y += turnInput * TURN_SPEED;
+                
+                // COMBINE FORWARD AND LATERAL MOVEMENT
+                const forwardDir = new THREE.Vector3(0, 0, speed);
+                forwardDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
+                
+                // Total velocity = forward movement + lateral slide
+                velocity = forwardDir.clone().add(lateralVelocity);
+                
+                const nextPos = bikeGroup.position.clone().add(velocity);
 
-                if (checkCollisions(nextX, nextZ)) { 
-                    speed = -speed * 0.5; sfx.playLand(1.0); 
+                if (checkCollisions(nextPos.x, nextPos.z)) { 
+                    speed = -speed * 0.4; 
+                    lateralVelocity.multiplyScalar(0.2); // Reduce slide on collision
+                    sfx.playLand(1.2); 
                 } else { 
-                    velocity.set(0, 0, speed); 
-                    velocity.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y); 
-                    bikeGroup.position.add(velocity); 
+                    bikeGroup.position.copy(nextPos);
                 }
 
-                if (bikeGroup.position.x > MAP_LIMIT) { bikeGroup.position.x = MAP_LIMIT; speed = 0; }
-                if (bikeGroup.position.x < -MAP_LIMIT) { bikeGroup.position.x = -MAP_LIMIT; speed = 0; }
-                if (bikeGroup.position.z > MAP_LIMIT) { bikeGroup.position.z = MAP_LIMIT; speed = 0; }
-                if (bikeGroup.position.z < -MAP_LIMIT) { bikeGroup.position.z = -MAP_LIMIT; speed = 0; }
+                // Map boundaries
+                if (bikeGroup.position.x > MAP_LIMIT) { 
+                    bikeGroup.position.x = MAP_LIMIT; 
+                    speed = 0; 
+                    lateralVelocity.x = 0; 
+                }
+                if (bikeGroup.position.x < -MAP_LIMIT) { 
+                    bikeGroup.position.x = -MAP_LIMIT; 
+                    speed = 0; 
+                    lateralVelocity.x = 0; 
+                }
+                if (bikeGroup.position.z > MAP_LIMIT) { 
+                    bikeGroup.position.z = MAP_LIMIT; 
+                    speed = 0; 
+                    lateralVelocity.z = 0; 
+                }
+                if (bikeGroup.position.z < -MAP_LIMIT) { 
+                    bikeGroup.position.z = -MAP_LIMIT; 
+                    speed = 0; 
+                    lateralVelocity.z = 0; 
+                }
 
-                sfx.updateEngine(Math.abs(speed), isDrifting);
+                // Enhanced audio for Cybertruck
+                sfx.updateEngine(speedPercent, driftIntensity);
+                
                 checkRings();
                 updateBattery();
 
+                // Ground following
                 const groundH = getTerrainHeight(bikeGroup.position.x, bikeGroup.position.z);
                 verticalVelocity -= GRAVITY; 
                 bikeGroup.position.y += verticalVelocity;
 
-                // REINFORCED GROUND CLAMP
                 if (bikeGroup.position.y < groundH) { 
+                    const landingForce = Math.abs(verticalVelocity);
                     bikeGroup.position.y = groundH; 
-                    verticalVelocity = 0; 
-                }
-                if (bikeGroup.position.y < groundH) {
-                    bikeGroup.position.y = groundH;
+                    verticalVelocity = landingForce * 0.08;
+                    if(landingForce > 0.12) sfx.playLand(landingForce);
                 }
 
+                // Enhanced Cybertruck tilting
                 const aheadV = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
                 const nextXPos = bikeGroup.position.x + aheadV.x; 
                 const nextZPos = bikeGroup.position.z + aheadV.z; 
                 const nextH = getTerrainHeight(nextXPos, nextZPos);
                 
-                const angle = Math.atan2(nextH - groundH, 1.0); 
-                bikeGroup.rotation.x = THREE.MathUtils.lerp(bikeGroup.rotation.x, -angle, 0.2);
+                const pitchAngle = Math.atan2(nextH - groundH, 1.0); 
+                bikeGroup.rotation.x = THREE.MathUtils.lerp(bikeGroup.rotation.x, -pitchAngle, 0.18);
                 
-                const targetRoll = turnInput * 0.3; 
-                bikeGroup.rotation.z = THREE.MathUtils.lerp(bikeGroup.rotation.z, targetRoll, 0.1);
+                // Enhanced roll during slides
+                const targetRoll = turnInput * 0.35 + (driftIntensity * turnInput * 0.5); 
+                bikeGroup.rotation.z = THREE.MathUtils.lerp(bikeGroup.rotation.z, targetRoll, 0.12);
 
+                // Dynamic camera with slide-responsive positioning
                 const targetPos = bikeGroup.position.clone();
                 let camOffset = new THREE.Vector3();
-                let lookOffset = new THREE.Vector3(0, 1, 0);
+                let lookOffset = new THREE.Vector3(0, 1.2, 0);
 
-                // --- 2 CAMERA MODES LOGIC ---
+                const cameraShake = driftIntensity * 0.15;
+                const speedOffset = speedPercent * 2.5;
+
                 switch(activeCameraMode) {
-                    case 0: // Chase Standard
-                        camOffset.set(0, 4, -8);
+                    case 0: // Dynamic Chase with slide tracking
+                        camOffset.set(
+                            (Math.random() - 0.5) * cameraShake - lateralVelocity.x * 3,
+                            4.5 + speedOffset,
+                            -9 - speedOffset
+                        );
                         camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
                         break;
-                    case 1: // Top Down (Relative)
-                        camOffset.set(0, 25, -2);
+                    case 1: // Top Down
+                        camOffset.set(
+                            (Math.random() - 0.5) * cameraShake,
+                            28 + speedOffset * 2,
+                            -3
+                        );
                         camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
                         break;
                 }
 
                 const camPos = targetPos.clone().add(camOffset);
                 const camGroundH = getTerrainHeight(camPos.x, camPos.z);
-                if (camPos.y < camGroundH + 1.0) camPos.y = camGroundH + 1.0;
+                if (camPos.y < camGroundH + 1.5) camPos.y = camGroundH + 1.5;
 
-                camera.position.lerp(camPos, 0.1);
+                camera.position.lerp(camPos, 0.14);
                 camera.lookAt(targetPos.clone().add(lookOffset));
             }
 
-            createDust(); updateParticles();
-            document.getElementById('speed').innerText = Math.abs(Math.round(speed * 100)) + " KM/H";
+            // Enhanced particle generation
+            if(frameCount % 3 === 0) createDust();
+            if(isDriftActive && frameCount % 1 === 0) createTireSmoke(); // Continuous smoke during slides
+            
+            updateParticles();
+            
+            const displaySpeed = Math.abs(Math.round(speed * 90));
+            document.getElementById('speed').innerText = displaySpeed + " KM/H";
+            
             renderer.render(scene, camera);
         }
 
@@ -892,5 +1432,3 @@
     </script>
 </body>
 </html>
-
-
