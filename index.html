@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cybertruck Madness '98 - FBX Model</title>
+    <title>Cybertruck Madness '98 - Fixed</title>
     
     <script type="importmap">
     {
@@ -212,7 +212,6 @@
     <script type="module">
         import * as THREE from 'three';
         import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
-        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
         let scene, camera, renderer;
@@ -248,27 +247,6 @@
         let activeCameraMode = 0; 
         let analogSteering = 0;
         let analogThrottle = 0; 
-
-        // GLOBAL INPUT LISTENER TO WAKE UP AUDIO
-        function wakeUpAudio() {
-            if (sfx.ctx && sfx.ctx.state === 'suspended') {
-                sfx.ctx.resume().then(() => {
-                    sfx.playMusic();
-                });
-            } else if (sfx.ctx && sfx.ctx.state === 'running') {
-                sfx.playMusic();
-            } else {
-                sfx.init();
-                sfx.playMusic();
-            }
-            window.removeEventListener('touchstart', wakeUpAudio);
-            window.removeEventListener('keydown', wakeUpAudio);
-            window.removeEventListener('mousedown', wakeUpAudio);
-        }
-        window.addEventListener('touchstart', wakeUpAudio);
-        window.addEventListener('keydown', wakeUpAudio);
-        window.addEventListener('mousedown', wakeUpAudio);
-
 
         const joystick = {
             active: false, origin: { x: 0, y: 0 }, maxDist: 50,
@@ -314,7 +292,7 @@
         const sfx = {
             ctx: null, engineOsc: null, engineGain: null, filter: null, noiseBuffer: null, skidOsc: null, skidGain: null, bgm: null, isMusicOn: true, isSfxOn: true,
             init: function() {
-                if (this.ctx) return; 
+                if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
                 try {
                     const AC = window.AudioContext || window.webkitAudioContext; this.ctx = new AC();
                     const bufferSize = this.ctx.sampleRate * 2; this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
@@ -454,10 +432,8 @@
             const fbxLoader = new FBXLoader();
             
             // 1. Load Moto FBX
-            // Use absolute URL hack to prevent blob errors
-            const url = new URL('fbx/moto.fbx', document.baseURI).href;
-
-            fbxLoader.load(url, (object) => {
+            // Use direct string path 'fbx/moto.fbx' as requested.
+            fbxLoader.load('fbx/moto.fbx', (object) => {
                 object.scale.set(0.005, 0.005, 0.005); 
                 object.rotation.y = Math.PI; 
                 object.traverse((child) => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
@@ -484,7 +460,7 @@
             const leaves1 = new THREE.ConeGeometry(1.2, 1.5, 5); leaves1.translate(0, 2.0, 0);
             const leaves2 = new THREE.ConeGeometry(0.9, 1.2, 5); leaves2.translate(0, 2.8, 0);
             const leaves3 = new THREE.ConeGeometry(0.6, 1.0, 5); leaves3.translate(0, 3.5, 0);
-            const count = 120;
+            const count = 150;
             const dummy = new THREE.Object3D();
             const trunkMat = new THREE.MeshStandardMaterial({color: 0x3d2817});
             const leafMat = new THREE.MeshStandardMaterial({color: 0x1a472a});
@@ -497,7 +473,11 @@
                 const x = (Math.random() - 0.5) * 300; const z = (Math.random() - 0.5) * 300;
                 if(Math.abs(x) < 20 && Math.abs(z) < 20) { i--; continue; }
                 const y = getTerrainHeight(x, z); const s = 1.0 + Math.random() * 0.5;
-                dummy.position.set(x, y, z); dummy.rotation.y = Math.random() * Math.PI; dummy.scale.set(s,s,s); dummy.updateMatrix();
+                // Height variance
+                const widthS = 1.0 + Math.random() * 0.5;
+                const heightS = widthS * (0.8 + Math.random() * 0.8);
+                
+                dummy.position.set(x, y, z); dummy.rotation.y = Math.random() * Math.PI; dummy.scale.set(widthS, heightS, widthS); dummy.updateMatrix();
                 trunkMesh.setMatrixAt(i, dummy.matrix); leafMesh.setMatrixAt(i, dummy.matrix);
                 obstacles.push({x:x, z:z, radius: 1.0});
             }
