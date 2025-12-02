@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Tesla Madness 1998 - SFX Control</title>
+    <title>Cybertruck Madness 1998 - SFX Control</title>
     
     <script type="importmap">
     {
@@ -239,7 +239,7 @@
 
     <!-- LEFT HEADER -->
     <div id="ui-layer">
-        <h1>TESLA MADNESS '98</h1>
+        <h1>CYBERTRUCK MADNESS '98</h1>
         <div class="battery-container">
             <div id="battery-bar"></div>
             <div id="battery-text">BATTERY: 100%</div>
@@ -439,6 +439,7 @@
                 this.skidOsc.start();
 
                 // Music Setup
+                // Note: This URL will likely fail in this environment, but the catch block below handles it.
                 this.bgm = new Audio('music/cybertruck.mp3');
                 this.bgm.loop = true;
                 this.bgm.volume = 0.6;
@@ -446,7 +447,9 @@
             
             playMusic: function() {
                 if (this.bgm && this.isMusicOn && this.bgm.paused) {
-                    this.bgm.play().catch(e => {});
+                    this.bgm.play().catch(e => {
+                        // console.log("Music failed to play (expected if file missing)");
+                    });
                 }
             },
 
@@ -454,7 +457,7 @@
                 this.isMusicOn = !this.isMusicOn;
                 const btn = document.getElementById('music-indicator');
                 if (this.isMusicOn) {
-                    if(this.bgm) this.bgm.play();
+                    if(this.bgm) this.bgm.play().catch(e=>{});
                     btn.innerText = "MUSIC: ON";
                     btn.classList.remove('off');
                 } else {
@@ -720,11 +723,57 @@
             for(let i=0; i< 30; i++) { const x = (Math.random() - 0.5) * 350; const z = (Math.random() - 0.5) * 350; const y = getTerrainHeight(x, z); const rock = new THREE.Mesh(rockGeo, rockMat); rock.position.set(x, y + 0.5, z); rock.scale.set(1 + Math.random(), 1 + Math.random(), 1 + Math.random()); rock.rotation.set(Math.random(), Math.random(), Math.random()); rock.castShadow = true; scene.add(rock); obstacles.push({ x: x, z: z, radius: 1.0 }); }
         }
         
+        function createDriftSmoke() {
+            if(!bikeGroup) return; 
+            // Create smoke at rear wheel position
+            const offset = new THREE.Vector3(0, 0.2, 0.5); // Slightly behind center
+            offset.applyMatrix4(bikeGroup.matrixWorld);
+            
+            const geo = new THREE.DodecahedronGeometry(0.3, 0);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.6 });
+            const p = new THREE.Mesh(geo, mat);
+            
+            p.position.copy(offset);
+            // Add some random spread
+            p.position.x += (Math.random() - 0.5) * 0.5;
+            p.position.z += (Math.random() - 0.5) * 0.5;
+            
+            // Ground clamp
+            const gH = getTerrainHeight(p.position.x, p.position.z);
+            if(p.position.y < gH) p.position.y = gH + 0.1;
+            
+            scene.add(p);
+            // Drift smoke lasts longer and grows bigger
+            particles.push({ mesh: p, life: 1.5, isSmoke: true });
+        }
+
         function createDust() {
             if(!bikeGroup) return; const exhaust = bikeGroup.getObjectByName("exhaust"); if (!exhaust) return; if (Math.abs(speed) < 0.1) return;
             const pos = new THREE.Vector3(); exhaust.getWorldPosition(pos); const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2); const mat = new THREE.MeshBasicMaterial({ color: 0x8b7e66, transparent: true, opacity: 0.4 }); const p = new THREE.Mesh(geo, mat); p.position.copy(pos); p.position.x += (Math.random() - 0.5) * 0.3; const gH = getTerrainHeight(pos.x, pos.z); if(p.position.y < gH) p.position.y = gH + 0.2; scene.add(p); particles.push({ mesh: p, life: 1.0 });
         }
-        function updateParticles() { for (let i = particles.length - 1; i >= 0; i--) { const p = particles[i]; p.life -= 0.02; p.mesh.position.y += 0.02; p.mesh.scale.multiplyScalar(1.05); p.mesh.material.opacity = p.life * 0.4; p.mesh.rotation.x += 0.1; if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); } } }
+        function updateParticles() { 
+            for (let i = particles.length - 1; i >= 0; i--) { 
+                const p = particles[i]; 
+                p.life -= 0.02; 
+                p.mesh.position.y += 0.03; // Smoke rises
+                
+                if (p.isSmoke) {
+                    p.mesh.scale.multiplyScalar(1.03); // Smoke expands
+                    p.mesh.material.opacity = p.life * 0.5;
+                } else {
+                    // Dust
+                    p.mesh.position.y += 0.02; 
+                    p.mesh.scale.multiplyScalar(1.05); 
+                    p.mesh.material.opacity = p.life * 0.4; 
+                    p.mesh.rotation.x += 0.1; 
+                }
+                
+                if (p.life <= 0) { 
+                    scene.remove(p.mesh); 
+                    particles.splice(i, 1); 
+                } 
+            } 
+        }
         function onKey(e, pressed) { const k = e.key.toLowerCase(); if (k === 'w' || k === 'arrowup') keys.w = pressed; if (k === 's' || k === 'arrowdown') keys.s = pressed; if (k === 'a' || k === 'arrowleft') keys.a = pressed; if (k === 'd' || k === 'arrowright') keys.d = pressed; if (k === ' ') keys.space = pressed; }
         
         function switchCamera() { 
@@ -789,20 +838,32 @@
             if (battery > 0) { if (throttleInput > 0) speed += ACCEL * throttleInput; }
             if (throttleInput < 0) speed += ACCEL * throttleInput; 
             
-            // BRAKE LOGIC
-            if (keys.brake) {
-                speed *= BRAKE_FRICTION; // Strong slow down
-            } else {
-                speed *= FRICTION; // Normal friction
-            }
-            
             let turnInput = 0; if (keys.a) turnInput += 1; if (keys.d) turnInput -= 1; turnInput += analogSteering; 
-            if (bikeGroup && Math.abs(speed) > 0.05) bikeGroup.rotation.y += turnInput * TURN_SPEED;
 
             // DRIFT LOGIC
             let isDrifting = false;
-            if (Math.abs(speed) > 0.4 && Math.abs(turnInput) > 0.5 && keys.brake) {
+            if (Math.abs(speed) > 0.3 && Math.abs(turnInput) > 0.1 && keys.brake) {
                 isDrifting = true;
+            }
+
+            // BRAKE PHYSICS
+            if (keys.brake) {
+                if (isDrifting) {
+                     // Handbrake drift: Less speed loss (sliding) but sharp turning
+                     speed *= 0.97; 
+                } else {
+                     // Normal straight line braking
+                     speed *= BRAKE_FRICTION; 
+                }
+            } else {
+                speed *= FRICTION; // Normal rolling friction
+            }
+            
+            // APPLY TURNING
+            if (bikeGroup && Math.abs(speed) > 0.05) {
+                // If drifting, we turn significantly faster visually (Oversteer)
+                let effectiveTurnSpeed = TURN_SPEED * (isDrifting ? 2.5 : 1.0);
+                bikeGroup.rotation.y += turnInput * effectiveTurnSpeed;
             }
 
             if (bikeGroup) {
@@ -812,10 +873,12 @@
                 const nextZ = bikeGroup.position.z + nextVel.z;
 
                 if(isDrifting) {
-                    const slideAmt = speed * turnInput * 0.08; // Stronger drift
-                    bikeGroup.rotation.y += turnInput * 0.05; 
-                    bikeGroup.translateX(-slideAmt); 
-                    if(frameCount % 3 === 0) createDust(); 
+                    // SLIDE PHYSICS: Move perpendicular to the turn
+                    // If turning Left (+), nose points Left, inertia carries Right
+                    const slidePower = 0.2; 
+                    bikeGroup.translateX(turnInput * speed * slidePower);
+                    
+                    if(frameCount % 2 === 0) createDriftSmoke(); 
                 }
 
                 if (checkCollisions(nextX, nextZ)) { 
@@ -892,5 +955,3 @@
     </script>
 </body>
 </html>
-
-
