@@ -438,18 +438,9 @@
                 this.skidGain.connect(this.ctx.destination);
                 this.skidOsc.start();
 
-                // Music Setup with Adaptive Loading & Preloading
+                // Music Setup - Prioritize High Res
                 let musicFile = 'music/cybertruck.mp3';
                 
-                // Adaptive Audio Check
-                const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                if (connection) {
-                    if (connection.saveData || connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g' || connection.downlink < 1.5) {
-                        musicFile = 'music/cybertrucklowres.mp3';
-                        console.log("Slow connection detected. Using low-res audio.");
-                    }
-                }
-
                 this.bgm = new Audio();
                 this.bgm.loop = true;
                 this.bgm.volume = 0.6;
@@ -466,7 +457,8 @@
                 this.bgm.addEventListener('error', (e) => {
                     console.warn("Audio load error, fallback initiated.");
                     if(progressAudio < 100) {
-                        // Attempt fallback or just proceed
+                        // Attempt fallback to lowres
+                        this.bgm.src = 'music/cybertrucklowres.mp3';
                         progressAudio = 100; 
                         assetsLoaded++;
                         checkLoading();
@@ -645,12 +637,15 @@
             // 1. Load Moto
             loader.load('fbx/moto.fbx', (object) => {
                 object.scale.set(0.005, 0.005, 0.005);
-                // FIXED ORIENTATION: The FBX model seems to be oriented with Z-up in its local space.
-                // We need to rotate it to match Three.js Y-up.
-                // Rotate 90 degrees around X-axis to flat it on the floor.
-                // Then rotate 180 degrees around Y-axis to face "forward" (away from camera).
-                object.rotation.set(-Math.PI / 2, Math.PI, 0); 
                 
+                // DESIGN FIX: Reset orientation.
+                // Assuming standard model: Remove X-axis rotation that caused nose-dive.
+                // Keep Y-axis 180 rotation to face away from camera (up-screen).
+                object.rotation.set(0, Math.PI, 0); 
+                
+                // PIVOT FIX: Lift the visual model slightly so wheels sit ON the ground, not IN it.
+                object.position.set(0, 0.5, 0);
+
                 object.traverse((child) => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
                 bikeGroup.add(object);
                 addExhaust();
@@ -674,43 +669,7 @@
             });
 
             // NO TREES LOADED HERE
-            createProceduralPines();
             createRocks();
-        }
-
-        function createProceduralPines() {
-            // ... (Removed procedural pines logic as per 'Remove all instances' request if they were meant to replace FBX trees, but user asked to remove "Tree.fbx". I will leave procedural geometry pines as environmental filler, unless 'Remove all instances' referred to visual trees entirely. Assuming FBX trees only.)
-            // Actually, for "Remove all instances of Tree.fbx", I should strictly remove the FBX loader part.
-            // I will KEEP these procedural pines as they are not "Tree.fbx".
-            const trunkGeo = new THREE.CylinderGeometry(0.2, 0.4, 1.5, 5); trunkGeo.translate(0, 0.75, 0);
-            const leaves1 = new THREE.ConeGeometry(1.2, 1.5, 5); leaves1.translate(0, 2.0, 0);
-            const leaves2 = new THREE.ConeGeometry(0.9, 1.2, 5); leaves2.translate(0, 2.8, 0);
-            const leaves3 = new THREE.ConeGeometry(0.6, 1.0, 5); leaves3.translate(0, 3.5, 0);
-            
-            const count = 40; // Reduced count slightly
-            const dummy = new THREE.Object3D();
-            const trunkMat = new THREE.MeshStandardMaterial({color: 0x3d2817});
-            const leafMat = new THREE.MeshStandardMaterial({color: 0x1a472a});
-            const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
-            const leafGeo = BufferGeometryUtils.mergeGeometries([leaves1, leaves2, leaves3]);
-            const leafMesh = new THREE.InstancedMesh(leafGeo, leafMat, count);
-            
-            trunkMesh.castShadow = true; trunkMesh.receiveShadow = true;
-            leafMesh.castShadow = true; leafMesh.receiveShadow = true;
-            
-            // Disable culling to prevent invisible trees
-            trunkMesh.frustumCulled = false;
-            leafMesh.frustumCulled = false;
-
-            for(let i=0; i<count; i++) {
-                const x = (Math.random() - 0.5) * 300; const z = (Math.random() - 0.5) * 300;
-                if(Math.abs(x) < 20 && Math.abs(z) < 20) { i--; continue; }
-                const y = getTerrainHeight(x, z); const s = 1.0 + Math.random() * 0.5;
-                dummy.position.set(x, y, z); dummy.rotation.y = Math.random() * Math.PI; dummy.scale.set(s,s,s); dummy.updateMatrix();
-                trunkMesh.setMatrixAt(i, dummy.matrix); leafMesh.setMatrixAt(i, dummy.matrix);
-                obstacles.push({x:x, z:z, radius: 1.0});
-            }
-            scene.add(trunkMesh); scene.add(leafMesh);
         }
 
         function createFallbackBike() {
