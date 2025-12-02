@@ -438,11 +438,33 @@
                 this.skidGain.connect(this.ctx.destination);
                 this.skidOsc.start();
 
-                // Music Setup
-                // Note: This URL will likely fail in this environment, but the catch block below handles it.
-                this.bgm = new Audio('music/cybertruck.mp3');
+                // Music Setup with Adaptive Loading
+                let musicFile = 'music/cybertruck.mp3';
+                
+                // Check connection speed if available (Chrome/Android mostly)
+                const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                if (connection) {
+                    console.log("Connection effectiveType:", connection.effectiveType, "Downlink:", connection.downlink);
+                    // If connection is slow (e.g., 2g, slow-2g, or downlink < 1.5 Mbps)
+                    if (connection.saveData || connection.effectiveType === 'slow-2g' || connection.effectiveType === '2g' || connection.downlink < 1.5) {
+                        musicFile = 'music/cybertrucklowres.mp3';
+                        console.log("Slow connection detected. Using low-res audio.");
+                    }
+                }
+
+                this.bgm = new Audio(musicFile);
                 this.bgm.loop = true;
                 this.bgm.volume = 0.6;
+                
+                // Fallback mechanism: If high-res fails, try low-res
+                this.bgm.onerror = () => {
+                    console.warn("Audio load error for:", musicFile);
+                    if (musicFile === 'music/cybertruck.mp3') {
+                        console.log("Falling back to low-res audio.");
+                        this.bgm.src = 'music/cybertrucklowres.mp3';
+                        if (this.isMusicOn) this.bgm.play().catch(e => {});
+                    }
+                };
             },
             
             playMusic: function() {
@@ -780,7 +802,7 @@
                 } 
             } 
         }
-        function onKey(e, pressed) { const k = e.key.toLowerCase(); if (k === 'w' || k === 'arrowup') keys.w = pressed; if (k === 's' || k === 'arrowdown') keys.s = pressed; if (k === 'a' || k === 'arrowleft') keys.a = pressed; if (k === 'd' || k === 'arrowright') keys.d = pressed; if (k === ' ') keys.space = pressed; }
+        function onKey(e, pressed) { const k = e.key.toLowerCase(); if (k === 'w' || k === 'arrowup') keys.w = pressed; if (k === 's' || k === 'arrowdown') keys.s = pressed; if (k === 'a' || k === 'arrowleft') keys.a = pressed; if (k === 'd' || k === 'arrowright') keys.d = pressed; if (k === ' ') keys.brake = pressed; }
         
         function switchCamera() { 
             activeCameraMode = (activeCameraMode + 1) % 2; 
@@ -847,49 +869,22 @@
             let turnInput = 0; if (keys.a) turnInput += 1; if (keys.d) turnInput -= 1; turnInput += analogSteering; 
 
             // --- ADVANCED DRIFT PHYSICS 2.0 ---
-            
-            // 1. Calculate how quickly the player is changing direction (Initiation Snap)
-            // If previous input was 0 and now is 1, delta is 1. 
-            // If switching from -1 to 1, delta is 2 (Huge snap).
             const turnDelta = Math.abs(turnInput - lastTurnInput);
             lastTurnInput = turnInput;
 
             let isDrifting = false;
 
-            // 2. Drift Initiation Logic
-            // Needs speed (> 0.3) AND Brake held.
             if (keys.brake && Math.abs(speed) > 0.3) {
                 isDrifting = true;
-                
-                // PHYSICS: Centrifugal Force
-                // F = mv^2/r. The faster you go, the more you want to slide out.
-                // We square the speed so entering fast results in a HUGE slide.
                 const centrifugalFactor = (speed * speed) * turnInput; 
-                
-                // PHYSICS: Initiation "Kick"
-                // If you snap the steering (high turnDelta), you upset the balance more.
-                // This simulates the "Scandinavian Flick".
                 const kickFactor = turnDelta * speed * 2.0 * Math.sign(turnInput);
-                
-                // Add these forces to our lateral velocity.
-                // We multiply by 0.1 to scale it to frame-by-frame physics.
                 lateralVelocity += (centrifugalFactor + kickFactor) * 0.15;
-                
-                // VISUALS: Oversteer
-                // When drifting, the car rotates faster than it actually changes direction.
                 bikeGroup.rotation.y += turnInput * 0.09; 
-                
-                // Slightly preserve speed (Slide instead of stop)
                 speed *= 0.97;
             } else {
                 isDrifting = false;
-                // Normal Braking (if not drifting)
                 if(keys.brake) speed *= BRAKE_FRICTION;
-                
-                // Regain Traction: Lateral velocity decays quickly when not drifting
                 lateralVelocity *= 0.85; 
-                
-                // Normal Turning
                 if (Math.abs(speed) > 0.05) bikeGroup.rotation.y += turnInput * TURN_SPEED;
             }
             
@@ -904,16 +899,8 @@
                 const nextX = bikeGroup.position.x + nextVel.x; 
                 const nextZ = bikeGroup.position.z + nextVel.z;
 
-                // APPLY LATERAL SLIDE
-                // We slide along the local X axis. 
-                // Note: lateralVelocity is signed based on turnInput (Left Turn + -> Slide Right +)
-                // We actually want the car to slide "out" of the turn.
-                // If turning Left (+ rotation), centrifugal force pushes Right (- local X? No, + local X depends on mesh orientation).
-                // Let's assume standard ThreeJS: +X is Right.
-                // Left Turn (Positive Rot) -> Push Right (Positive X)
                 bikeGroup.translateX(lateralVelocity);
 
-                // Create Smoke if sliding hard
                 if (Math.abs(lateralVelocity) > 0.05 && frameCount % 3 === 0) {
                     createDriftSmoke(Math.abs(lateralVelocity));
                 }
@@ -926,7 +913,6 @@
                     bikeGroup.position.add(velocity); 
                 }
 
-                // REMOVED "speed = 0" SO WALLS ARE LESS JARRING
                 if (bikeGroup.position.x > MAP_LIMIT) { bikeGroup.position.x = MAP_LIMIT; }
                 if (bikeGroup.position.x < -MAP_LIMIT) { bikeGroup.position.x = -MAP_LIMIT; }
                 if (bikeGroup.position.z > MAP_LIMIT) { bikeGroup.position.z = MAP_LIMIT; }
@@ -936,35 +922,59 @@
                 checkRings();
                 updateBattery();
 
-                const groundH = getTerrainHeight(bikeGroup.position.x, bikeGroup.position.z);
-                verticalVelocity -= GRAVITY; 
+                // --- NEW PHYSICS: WHEELS ON FLOOR (Terrain Conforming) ---
+                const chassisLen = 1.2;  // Distance from center to front/back
+                const chassisWidth = 0.8; // Distance from center to left/right
+
+                // Get local Forward and Right vectors based on current Yaw (Y rotation only)
+                const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0,1,0), bikeGroup.rotation.y);
+                const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0,1,0), bikeGroup.rotation.y);
+
+                // Sample points relative to center
+                const pFront = bikeGroup.position.clone().add(forward.clone().multiplyScalar(chassisLen));
+                const pBack  = bikeGroup.position.clone().add(forward.clone().multiplyScalar(-chassisLen));
+                const pLeft  = bikeGroup.position.clone().add(right.clone().multiplyScalar(-chassisWidth));
+                const pRight = bikeGroup.position.clone().add(right.clone().multiplyScalar(chassisWidth));
+
+                // Get heights
+                const hFront = getTerrainHeight(pFront.x, pFront.z);
+                const hBack  = getTerrainHeight(pBack.x, pBack.z);
+                const hLeft  = getTerrainHeight(pLeft.x, pLeft.z);
+                const hRight = getTerrainHeight(pRight.x, pRight.z);
+                const hCenter = getTerrainHeight(bikeGroup.position.x, bikeGroup.position.z);
+
+                // Calculate Pitch (Nose Up/Down)
+                // Pitch angle = atan2(height_diff, length)
+                // Positive pitch = Nose Up (Front higher than Back)
+                const targetPitch = Math.atan2(hBack - hFront, chassisLen * 2);
+
+                // Calculate Roll (Tilt Left/Right)
+                // Positive roll = Tilt Right (Left higher than Right)
+                const targetRollTerrain = Math.atan2(hLeft - hRight, chassisWidth * 2);
+                
+                // Add "Body Roll" from turning physics (Leaning into turn)
+                const bodyRoll = turnInput * 0.15; // Steering tilt
+                const finalRoll = targetRollTerrain + bodyRoll;
+
+                // Smoothly interpolate to new angles
+                bikeGroup.rotation.x = THREE.MathUtils.lerp(bikeGroup.rotation.x, targetPitch, 0.2);
+                bikeGroup.rotation.z = THREE.MathUtils.lerp(bikeGroup.rotation.z, finalRoll, 0.2);
+
+                // Keep Main Body on ground (Average height or Center height)
+                verticalVelocity -= GRAVITY;
                 bikeGroup.position.y += verticalVelocity;
 
-                // REINFORCED GROUND CLAMP
-                if (bikeGroup.position.y < groundH) { 
-                    bikeGroup.position.y = groundH; 
+                if (bikeGroup.position.y < hCenter) { 
+                    bikeGroup.position.y = hCenter; 
                     verticalVelocity = 0; 
                 }
-                if (bikeGroup.position.y < groundH) {
-                    bikeGroup.position.y = groundH;
-                }
-
-                const aheadV = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                const nextXPos = bikeGroup.position.x + aheadV.x; 
-                const nextZPos = bikeGroup.position.z + aheadV.z; 
-                const nextH = getTerrainHeight(nextXPos, nextZPos);
                 
-                const angle = Math.atan2(nextH - groundH, 1.0); 
-                bikeGroup.rotation.x = THREE.MathUtils.lerp(bikeGroup.rotation.x, -angle, 0.2);
-                
-                const targetRoll = turnInput * 0.3; 
-                bikeGroup.rotation.z = THREE.MathUtils.lerp(bikeGroup.rotation.z, targetRoll, 0.1);
+                // --- END NEW PHYSICS ---
 
                 const targetPos = bikeGroup.position.clone();
                 let camOffset = new THREE.Vector3();
                 let lookOffset = new THREE.Vector3(0, 1, 0);
 
-                // --- 2 CAMERA MODES LOGIC ---
                 switch(activeCameraMode) {
                     case 0: // Chase Standard
                         camOffset.set(0, 4, -8);
