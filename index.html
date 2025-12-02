@@ -637,13 +637,20 @@
             const loader = new FBXLoader();
             bikeGroup = new THREE.Group(); 
             // Initialize high to avoid floor clipping on load
-            bikeGroup.position.set(0, 10, 0); 
+            bikeGroup.position.set(0, 10, 0);
+            // Initialize rotation to 0. Physics will handle it immediately.
+            bikeGroup.rotation.set(0, 0, 0);
             scene.add(bikeGroup); 
 
             // 1. Load Moto
             loader.load('fbx/moto.fbx', (object) => {
                 object.scale.set(0.005, 0.005, 0.005);
-                object.rotation.set(0, Math.PI, 0); // Face forward
+                // FIXED ORIENTATION: The FBX model seems to be oriented with Z-up in its local space.
+                // We need to rotate it to match Three.js Y-up.
+                // Rotate 90 degrees around X-axis to flat it on the floor.
+                // Then rotate 180 degrees around Y-axis to face "forward" (away from camera).
+                object.rotation.set(-Math.PI / 2, Math.PI, 0); 
+                
                 object.traverse((child) => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
                 bikeGroup.add(object);
                 addExhaust();
