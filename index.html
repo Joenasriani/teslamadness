@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Tesla Madness 1998 - Auto Start</title>
+    <title>Tesla Madness 1998 - Smooth Bass</title>
     
     <script type="importmap">
     {
@@ -209,15 +209,13 @@
         let lastTime = 0;
         let isAirborne = false;
         let assetsLoaded = 0;
-        let assetsTotal = 1; // Cybertruck GLB
+        let assetsTotal = 1; 
         let obstacles = [];
         let gameStarted = false;
         
         let progressMoto = 0;
-        let progressTree = 0;
         let battery = 100;
         
-        // TUNING
         const BATTERY_DRAIN = 0.05; 
         const RING_CHARGE = 20;
         const MAX_SPEED = 1.4;
@@ -231,28 +229,6 @@
         let activeCameraMode = 0; 
         let analogSteering = 0;
         let analogThrottle = 0; 
-
-        // GLOBAL INPUT LISTENER TO WAKE UP AUDIO
-        function wakeUpAudio() {
-            if (sfx.ctx && sfx.ctx.state === 'suspended') {
-                sfx.ctx.resume().then(() => {
-                    sfx.playMusic();
-                });
-            } else if (sfx.ctx && sfx.ctx.state === 'running') {
-                sfx.playMusic();
-            } else {
-                sfx.init();
-                sfx.playMusic();
-            }
-            // Remove listeners after first interaction
-            window.removeEventListener('touchstart', wakeUpAudio);
-            window.removeEventListener('keydown', wakeUpAudio);
-            window.removeEventListener('mousedown', wakeUpAudio);
-        }
-        window.addEventListener('touchstart', wakeUpAudio);
-        window.addEventListener('keydown', wakeUpAudio);
-        window.addEventListener('mousedown', wakeUpAudio);
-
 
         const joystick = {
             active: false, origin: { x: 0, y: 0 }, maxDist: 50,
@@ -304,15 +280,21 @@
                     const bufferSize = this.ctx.sampleRate * 2; this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
                     const data = this.noiseBuffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
                     
-                    this.engineOsc = this.ctx.createOscillator(); this.engineOsc.type = 'triangle'; this.engineOsc.frequency.value = 60;
+                    // ENGINE: Bassy Triangle
+                    this.engineOsc = this.ctx.createOscillator(); this.engineOsc.type = 'triangle'; this.engineOsc.frequency.value = 40; // Start low
                     this.engineGain = this.ctx.createGain(); this.engineGain.gain.value = 0;
-                    this.filter = this.ctx.createBiquadFilter(); this.filter.type = 'lowpass'; this.filter.frequency.value = 400;
+                    this.filter = this.ctx.createBiquadFilter(); this.filter.type = 'lowpass'; this.filter.frequency.value = 120; // Muffle high end
                     this.engineOsc.connect(this.filter); this.filter.connect(this.engineGain); this.engineGain.connect(this.ctx.destination);
                     this.engineOsc.start();
 
-                    this.skidOsc = this.ctx.createOscillator(); this.skidOsc.type = 'sawtooth'; this.skidOsc.frequency.value = 150;
+                    // SKID: Rumbly Square (Simulates tire friction)
+                    this.skidOsc = this.ctx.createOscillator(); this.skidOsc.type = 'square'; this.skidOsc.frequency.value = 60;
                     this.skidGain = this.ctx.createGain(); this.skidGain.gain.value = 0;
-                    this.skidOsc.connect(this.skidGain); this.skidGain.connect(this.ctx.destination);
+                    
+                    // Filter skid to be a rumble
+                    const skidFilter = this.ctx.createBiquadFilter(); skidFilter.type = 'lowpass'; skidFilter.frequency.value = 180;
+
+                    this.skidOsc.connect(skidFilter); skidFilter.connect(this.skidGain); this.skidGain.connect(this.ctx.destination);
                     this.skidOsc.start();
 
                     this.bgm = new Audio('music/cybertruck.mp3'); 
@@ -339,27 +321,32 @@
             },
             updateEngine: function(speedPercent, isSkidding) {
                 if (!this.ctx || !this.isSfxOn) return;
-                this.engineOsc.frequency.setTargetAtTime(60 + (speedPercent * 300), this.ctx.currentTime, 0.1);
-                const vol = (0.05 + (speedPercent * 0.1)) * 0.3; 
+                // Engine Pitch: 40Hz to 100Hz
+                this.engineOsc.frequency.setTargetAtTime(40 + (speedPercent * 60), this.ctx.currentTime, 0.1);
+                const vol = (0.05 + (speedPercent * 0.1)) * 0.4; // Quieter
                 this.engineGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.1);
-                this.filter.frequency.setTargetAtTime(200 + (speedPercent * 3000), this.ctx.currentTime, 0.1);
-                const targetSkidVol = isSkidding ? 0.06 : 0;
+                this.filter.frequency.setTargetAtTime(120 + (speedPercent * 200), this.ctx.currentTime, 0.1);
+                
+                // Skid
+                const targetSkidVol = isSkidding ? 0.1 : 0; // Subtle rumble
                 this.skidGain.gain.setTargetAtTime(targetSkidVol, this.ctx.currentTime, 0.1);
+                // Vary skid rumble pitch slightly
+                this.skidOsc.frequency.setTargetAtTime(60 + Math.random()*20, this.ctx.currentTime, 0.1);
             },
             playCollect: function() {
                 if (!this.ctx || !this.isSfxOn) return;
                 const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
                 osc.type = 'sine'; osc.frequency.setValueAtTime(800, this.ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.3, this.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
                 osc.connect(gain); gain.connect(this.ctx.destination); osc.start(); osc.stop(this.ctx.currentTime + 0.5);
             },
             playLand: function(intensity) {
                 if (!this.ctx || !this.isSfxOn) return;
                 const src = this.ctx.createBufferSource(); src.buffer = this.noiseBuffer;
-                const gain = this.ctx.createGain(); gain.gain.setValueAtTime(Math.min(intensity * 0.5, 0.5), this.ctx.currentTime);
+                const gain = this.ctx.createGain(); gain.gain.setValueAtTime(Math.min(intensity * 0.4, 0.4), this.ctx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
                 const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(600, this.ctx.currentTime); filter.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.2);
+                filter.frequency.setValueAtTime(400, this.ctx.currentTime); filter.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.2);
                 src.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
                 src.start(); src.stop(this.ctx.currentTime + 0.3);
             }
@@ -390,8 +377,25 @@
             loadModels();
 
             window.addEventListener('resize', onWindowResize);
-            document.addEventListener('keydown', (e) => { if(gameStarted) onKey(e, true); });
+            document.addEventListener('keydown', (e) => { 
+                if(gameStarted) onKey(e, true); 
+                else {
+                    // Auto-start on first key
+                    document.getElementById('loading').style.display = 'none';
+                    gameStarted = true;
+                    sfx.init(); sfx.playMusic();
+                }
+            });
             document.addEventListener('keyup', (e) => onKey(e, false));
+            
+            // Auto-start on touch
+            document.addEventListener('touchstart', () => {
+                 if(!gameStarted && assetsLoaded >= assetsTotal) {
+                    document.getElementById('loading').style.display = 'none';
+                    gameStarted = true;
+                    sfx.init(); sfx.playMusic();
+                 }
+            }, { once: true });
             
             document.getElementById('camera-indicator').addEventListener('click', (e) => { e.stopPropagation(); switchCamera(); });
             document.getElementById('music-indicator').addEventListener('click', (e) => { e.stopPropagation(); sfx.toggleMusic(); });
@@ -429,8 +433,10 @@
         function loadModels() {
             const gltfLoader = new GLTFLoader();
             
-            // 1. Load Cybertruck GLB
-            gltfLoader.load('fbx/cybertruck.glb', (gltf) => {
+            // 1. Load Cybertruck GLB with absolute path for robustness
+            const url = new URL('fbx/cybertruck.glb', document.baseURI).href;
+            
+            gltfLoader.load(url, (gltf) => {
                 const object = gltf.scene;
                 object.scale.set(0.005, 0.005, 0.005); 
                 object.rotation.y = Math.PI; 
@@ -440,7 +446,26 @@
                 assetsLoaded++;
                 checkLoading();
             }, (xhr) => { if (xhr.lengthComputable) { progressMoto = (xhr.loaded / xhr.total) * 100; updateProgress(); } else { progressMoto = 50; updateProgress(); }
-            }, (error) => { console.warn("Cybertruck GLB missing."); reportError("cybertruck.glb"); createFallbackBike(); assetsLoaded++; checkLoading(); });
+            }, (error) => { 
+                console.warn("Cybertruck GLB missing.", error); 
+                // Attempt fallback to moto.fbx if GLB fails
+                const fbxLoader = new FBXLoader();
+                const fbxUrl = new URL('fbx/moto.fbx', document.baseURI).href;
+                fbxLoader.load(fbxUrl, (fbx) => {
+                     fbx.scale.set(0.005, 0.005, 0.005); 
+                     fbx.rotation.y = Math.PI;
+                     fbx.traverse((child) => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
+                     bikeVisuals.add(fbx);
+                     addExhaust();
+                     assetsLoaded++;
+                     checkLoading();
+                }, undefined, (e) => {
+                    reportError("MODELS"); 
+                    createFallbackBike(); 
+                    assetsLoaded++; 
+                    checkLoading(); 
+                });
+            });
 
             // 2. PROCEDURAL TREES ONLY
             createProceduralPines();
@@ -476,13 +501,11 @@
             const geo = new THREE.BoxGeometry(0.5, 0.5, 1); const mat = new THREE.MeshStandardMaterial({color: 0xff0000}); const mesh = new THREE.Mesh(geo, mat); mesh.position.y = 0.5; bikeGroup.add(mesh); addExhaust();
         }
         function addExhaust() { const exhaustPoint = new THREE.Object3D(); exhaustPoint.position.set(0, 0.5, -1.2); exhaustPoint.name = "exhaust"; bikeVisuals.add(exhaustPoint); }
-        
         function checkLoading() { 
             if (assetsLoaded >= assetsTotal) { 
-                document.getElementById('loading').style.display = 'none';
-                gameStarted = true;
-                sfx.init(); 
-                sfx.playMusic();
+                document.getElementById('loading-text').style.display = 'none';
+                document.getElementById('progress-bar').parentElement.style.display = 'none';
+                // Auto-Start Trigger Logic in listeners
             } 
         }
         
@@ -498,21 +521,31 @@
         }
 
         function createTerrain() {
-            const geometry = new THREE.PlaneGeometry(400, 400, 400, 400); geometry.rotateX(-Math.PI / 2); const positions = geometry.attributes.position.array;
+            const geometry = new THREE.PlaneGeometry(400, 400, 512, 512); geometry.rotateX(-Math.PI / 2); 
+            const positions = geometry.attributes.position.array;
             for (let i = 0; i < positions.length; i += 3) {
                 const x = positions[i]; const z = positions[i + 2];
                 const y = (Math.sin(x * 0.03) * 5) + (Math.cos(z * 0.03) * 5) + (Math.sin(x * 0.1 + z * 0.1) * 1.5) + (Math.random() * 0.2);
                 const dist = Math.sqrt(x*x + z*z); let bowl = 0; if(dist > 100) bowl = (dist - 100) * 0.15; positions[i + 1] = y + bowl;
             }
             geometry.computeVertexNormals();
-            const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 1024; const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#8B5A2B'; ctx.fillRect(0,0,1024,1024);
-            for(let i=0; i<50000; i++) {
-                const shade = Math.random(); if(shade > 0.6) ctx.fillStyle = '#A07040'; else if (shade > 0.3) ctx.fillStyle = '#5C4033'; else ctx.fillStyle = '#556B2F';
-                const x = Math.random() * 1024; const y = Math.random() * 1024; const size = Math.random() * 3 + 1; ctx.fillRect(x, y, size, size);
+            const canvas = document.createElement('canvas'); canvas.width = 2048; canvas.height = 2048; const ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = '#5e4b35'; ctx.fillRect(0,0,2048,2048);
+            for(let i=0; i<2000; i++) {
+                const x = Math.random() * 2048; const y = Math.random() * 2048; const rad = Math.random() * 60 + 20;
+                const grad = ctx.createRadialGradient(x, y, 0, x, y, rad);
+                grad.addColorStop(0, 'rgba(194, 178, 128, 0.3)'); grad.addColorStop(1, 'rgba(194, 178, 128, 0)');
+                ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI*2); ctx.fill();
             }
-            const tex = new THREE.CanvasTexture(canvas); tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(10, 10);
-            const material = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 });
+            for(let i=0; i<80000; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? '#3d2e1e' : '#7a6040';
+                const x = Math.random() * 2048; const y = Math.random() * 2048; const size = Math.random() * 3 + 1;
+                ctx.fillRect(x, y, size, size);
+            }
+
+            const tex = new THREE.CanvasTexture(canvas); tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(8, 8); tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            const material = new THREE.MeshStandardMaterial({ map: tex, roughness: 1.0, metalness: 0.0 });
             terrainMesh = new THREE.Mesh(geometry, material); terrainMesh.receiveShadow = true; scene.add(terrainMesh);
         }
 
@@ -575,6 +608,10 @@
 
         function animate(time) {
             requestAnimationFrame(animate);
+            
+            // Always render scene, even if paused, to avoid black screen
+            renderer.render(scene, camera);
+
             if (!gameStarted) return;
             
             if (time - lastTime >= 1000) { document.getElementById('fps').innerText = frameCount + " FPS"; frameCount = 0; lastTime = time; }
@@ -678,7 +715,6 @@
 
             createDust(); updateParticles();
             document.getElementById('speed').innerText = Math.abs(Math.round(speed * 100)) + " KM/H";
-            renderer.render(scene, camera);
         }
 
         init();
