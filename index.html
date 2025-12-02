@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cybertruck Madness 1998 - Design Fix</title>
+    <title>Cybertruck Madness 1998 - Auto-Align Update</title>
     
     <script type="importmap">
     {
@@ -632,12 +632,87 @@
             }
         }
 
+        // --- NEW AUTO-ALIGN FUNCTION ---
+        function normalizeModel(object) {
+            // 1. Compute Bounding Box
+            const box = new THREE.Box3().setFromObject(object);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            const center = new THREE.Vector3();
+            box.getCenter(center);
+
+            // 2. Auto-Orientation: Assume shortest dimension is Height (Y), longest is Length (Z)
+            // If the model is rotated, Y might not be the shortest.
+            // Let's create a wrapper to rotate it.
+            const wrapper = new THREE.Object3D();
+            
+            // Heuristic: If X is larger than Z, it's likely sideways. Rotate 90 Y.
+            // If Z is "short" and Y is "long", it might be standing up (nose down).
+            
+            // Standardizing: 
+            // We want Y to be up (smallest dimension usually for a car relative to length/width, 
+            // but Cybertruck is tall. Length is definitely longest).
+            // Length should be on Z axis.
+            
+            let rotationX = 0;
+            let rotationY = 0;
+            let rotationZ = 0;
+
+            // Check if model is "standing on nose" (Y > Z and Y ~ X or Y > X) - rare for cars but possible
+            // Check if model is "sideways" (X > Z)
+            
+            // Simple robust approach for this specific request:
+            // The user had issues with "nose down" or "tilted".
+            // We will force alignment based on bounding box largest axis.
+            
+            // Finding the main axis (Length)
+            const axes = [
+                { axis: 'x', len: size.x },
+                { axis: 'y', len: size.y },
+                { axis: 'z', len: size.z }
+            ];
+            axes.sort((a, b) => b.len - a.len); // Descending
+            const longest = axes[0].axis;
+            
+            // We want longest axis to be Z.
+            if (longest === 'x') {
+                rotationY = Math.PI / 2; // Rotate 90 deg around Y to bring X to Z
+            } else if (longest === 'y') {
+                rotationX = Math.PI / 2; // Rotate 90 deg around X to bring Y to Z
+            }
+            // If longest is already Z, good.
+
+            // Apply rotation to object
+            object.rotation.set(rotationX, rotationY, rotationZ);
+            
+            // Re-compute box after rotation to find new bottom
+            object.updateMatrixWorld();
+            const newBox = new THREE.Box3().setFromObject(object);
+            const newCenter = new THREE.Vector3();
+            newBox.getCenter(newCenter);
+            
+            // 3. Re-center Pivot to Bottom-Center
+            // We want the pivot (0,0,0) to be at [Center.x, Min.Y, Center.z] relative to the mesh
+            // So we shift the mesh opposite to that.
+            object.position.x = -newCenter.x;
+            object.position.y = -newBox.min.y; // Sit on ground
+            object.position.z = -newCenter.z;
+            
+            // 4. Final Wrapper Correction
+            // The user specifically asked for "Rotate 180 degrees horizontal" (Face -Z)
+            // Our previous step aligned longest to Z. It might be facing +Z or -Z. 
+            // Usually game models face +Z or -Z. 
+            // We will add a parent wrapper that handles the physics orientation (facing away from camera).
+            wrapper.add(object);
+            wrapper.rotation.y = Math.PI; // Face away from camera (Standard for this game view)
+            
+            return wrapper;
+        }
+
         function loadModels() {
             const loader = new FBXLoader();
             bikeGroup = new THREE.Group(); 
-            // Initialize high to avoid floor clipping on load
             bikeGroup.position.set(0, 10, 0);
-            // Initialize rotation to 0. Physics will handle it immediately.
             bikeGroup.rotation.set(0, 0, 0);
             scene.add(bikeGroup); 
 
@@ -645,16 +720,17 @@
             loader.load('fbx/moto.fbx', (object) => {
                 object.scale.set(0.005, 0.005, 0.005);
                 
-                // DESIGN FIX: Reset orientation.
-                // 180 degrees horizontal (Math.PI)
-                // 30 degrees vertical right tilt (-30 degrees on Z axis)
-                object.rotation.set(0, Math.PI, -30 * (Math.PI / 180)); 
+                // --- AUTO-ALIGN IMPLEMENTATION ---
+                // Normalize the model (Center pivot, snap to floor, align axis)
+                const normalizedModel = normalizeModel(object);
                 
-                // PIVOT FIX: Lift the visual model slightly so wheels sit ON the ground, not IN it.
-                object.position.set(0, 0.5, 0);
+                // Add to physics group
+                bikeGroup.add(normalizedModel);
+                
+                // Verify Wheel Contact immediately
+                verifyWheelContact();
 
-                object.traverse((child) => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
-                bikeGroup.add(object);
+                normalizedModel.traverse((child) => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
                 addExhaust();
                 assetsLoaded++;
                 checkLoading();
@@ -675,44 +751,15 @@
                 checkLoading(); 
             });
 
-            // NO TREES LOADED HERE
             createProceduralPines();
             createRocks();
         }
-
-        function createProceduralPines() {
-            // ... (Removed procedural pines logic as per 'Remove all instances' request if they were meant to replace FBX trees, but user asked to remove "Tree.fbx". I will leave procedural geometry pines as environmental filler, unless 'Remove all instances' referred to visual trees entirely. Assuming FBX trees only.)
-            // Actually, for "Remove all instances of Tree.fbx", I should strictly remove the FBX loader part.
-            // I will KEEP these procedural pines as they are not "Tree.fbx".
-            const trunkGeo = new THREE.CylinderGeometry(0.2, 0.4, 1.5, 5); trunkGeo.translate(0, 0.75, 0);
-            const leaves1 = new THREE.ConeGeometry(1.2, 1.5, 5); leaves1.translate(0, 2.0, 0);
-            const leaves2 = new THREE.ConeGeometry(0.9, 1.2, 5); leaves2.translate(0, 2.8, 0);
-            const leaves3 = new THREE.ConeGeometry(0.6, 1.0, 5); leaves3.translate(0, 3.5, 0);
-            
-            const count = 40; // Reduced count slightly
-            const dummy = new THREE.Object3D();
-            const trunkMat = new THREE.MeshStandardMaterial({color: 0x3d2817});
-            const leafMat = new THREE.MeshStandardMaterial({color: 0x1a472a});
-            const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
-            const leafGeo = BufferGeometryUtils.mergeGeometries([leaves1, leaves2, leaves3]);
-            const leafMesh = new THREE.InstancedMesh(leafGeo, leafMat, count);
-            
-            trunkMesh.castShadow = true; trunkMesh.receiveShadow = true;
-            leafMesh.castShadow = true; leafMesh.receiveShadow = true;
-            
-            // Disable culling to prevent invisible trees
-            trunkMesh.frustumCulled = false;
-            leafMesh.frustumCulled = false;
-
-            for(let i=0; i<count; i++) {
-                const x = (Math.random() - 0.5) * 300; const z = (Math.random() - 0.5) * 300;
-                if(Math.abs(x) < 20 && Math.abs(z) < 20) { i--; continue; }
-                const y = getTerrainHeight(x, z); const s = 1.0 + Math.random() * 0.5;
-                dummy.position.set(x, y, z); dummy.rotation.y = Math.random() * Math.PI; dummy.scale.set(s,s,s); dummy.updateMatrix();
-                trunkMesh.setMatrixAt(i, dummy.matrix); leafMesh.setMatrixAt(i, dummy.matrix);
-                obstacles.push({x:x, z:z, radius: 1.0});
-            }
-            scene.add(trunkMesh); scene.add(leafMesh);
+        
+        function verifyWheelContact() {
+            // Raycast down from current position to find ground immediately
+            // This prevents the car from starting "inside" the terrain if the terrain generation is high
+            const startH = getTerrainHeight(0, 0);
+            bikeGroup.position.y = startH + 0.5; // +0.5 buffer, physics will settle it
         }
 
         function createFallbackBike() {
