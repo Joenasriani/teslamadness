@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Tesla Madness 1998 - Cybertruck GLB</title>
+    <title>Tesla Madness 1998 - Auto Start</title>
     
     <script type="importmap">
     {
@@ -123,23 +123,6 @@
         #progress-bar { width: 0%; height: 100%; background: #ffcc00; transition: width 0.2s; }
         #loading-text { color: #aaa; font-size: 12px; }
         
-        /* START BUTTON (Overlay) */
-        #start-overlay {
-            display: none; /* Hidden until loaded */
-            margin-top: 10px;
-            padding: 15px 0;
-            width: 100%;
-            background: #ffcc00;
-            color: #000;
-            font-weight: bold;
-            font-size: 20px;
-            border: none;
-            cursor: pointer;
-            text-transform: uppercase;
-            animation: pulse 1s infinite;
-        }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
-
         /* CONTROLS */
         .touch-controls {
             position: absolute; bottom: max(20px, env(safe-area-inset-bottom)); left: 0; width: 100%; height: auto; pointer-events: none; z-index: 50;
@@ -168,7 +151,6 @@
                 <div id="progress-bar"></div>
             </div>
             <div id="loading-text">LOADING ASSETS...</div>
-            <button id="start-overlay">TAP TO START</button>
         </div>
     </div>
 
@@ -227,15 +209,13 @@
         let lastTime = 0;
         let isAirborne = false;
         let assetsLoaded = 0;
-        let assetsTotal = 1; // Cybertruck GLB
+        let assetsTotal = 1; 
         let obstacles = [];
-        let gameStarted = false;
+        let gameStarted = false; // Will start automatically when loaded
         
         let progressMoto = 0;
-        let progressTree = 0;
         let battery = 100;
         
-        // TUNING
         const BATTERY_DRAIN = 0.05; 
         const RING_CHARGE = 20;
         const MAX_SPEED = 1.4;
@@ -249,6 +229,28 @@
         let activeCameraMode = 0; 
         let analogSteering = 0;
         let analogThrottle = 0; 
+
+        // GLOBAL INPUT LISTENER TO WAKE UP AUDIO
+        function wakeUpAudio() {
+            if (sfx.ctx && sfx.ctx.state === 'suspended') {
+                sfx.ctx.resume().then(() => {
+                    sfx.playMusic();
+                });
+            } else if (sfx.ctx && sfx.ctx.state === 'running') {
+                sfx.playMusic();
+            } else {
+                sfx.init();
+                sfx.playMusic();
+            }
+            // Remove listeners after first interaction
+            window.removeEventListener('touchstart', wakeUpAudio);
+            window.removeEventListener('keydown', wakeUpAudio);
+            window.removeEventListener('mousedown', wakeUpAudio);
+        }
+        window.addEventListener('touchstart', wakeUpAudio);
+        window.addEventListener('keydown', wakeUpAudio);
+        window.addEventListener('mousedown', wakeUpAudio);
+
 
         const joystick = {
             active: false, origin: { x: 0, y: 0 }, maxDist: 50,
@@ -294,7 +296,7 @@
         const sfx = {
             ctx: null, engineOsc: null, engineGain: null, filter: null, noiseBuffer: null, skidOsc: null, skidGain: null, bgm: null, isMusicOn: true, isSfxOn: true,
             init: function() {
-                if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+                if (this.ctx) return; 
                 try {
                     const AC = window.AudioContext || window.webkitAudioContext; this.ctx = new AC();
                     const bufferSize = this.ctx.sampleRate * 2; this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
@@ -377,6 +379,10 @@
             dirLight.shadow.mapSize.width = 4096; dirLight.shadow.mapSize.height = 4096; dirLight.shadow.bias = -0.0001;
             scene.add(dirLight);
 
+            // Initialize BikeGroup immediately to prevent black screen crash
+            bikeGroup = new THREE.Group(); scene.add(bikeGroup); 
+            bikeVisuals = new THREE.Group(); bikeGroup.add(bikeVisuals);
+
             createTerrain();
             createRings(); 
             loadModels();
@@ -388,14 +394,6 @@
             document.getElementById('camera-indicator').addEventListener('click', (e) => { e.stopPropagation(); switchCamera(); });
             document.getElementById('music-indicator').addEventListener('click', (e) => { e.stopPropagation(); sfx.toggleMusic(); });
             document.getElementById('sfx-indicator').addEventListener('click', (e) => { e.stopPropagation(); sfx.toggleSfx(); });
-
-            // START BUTTON
-            document.getElementById('start-overlay').addEventListener('click', () => {
-                document.getElementById('loading').style.display = 'none';
-                gameStarted = true;
-                sfx.init(); 
-                sfx.playMusic();
-            });
 
             controls.init(); 
             animate();
@@ -427,13 +425,8 @@
         }
 
         function loadModels() {
-            const fbxLoader = new FBXLoader();
             const gltfLoader = new GLTFLoader();
-            bikeGroup = new THREE.Group(); scene.add(bikeGroup); 
             
-            bikeVisuals = new THREE.Group();
-            bikeGroup.add(bikeVisuals);
-
             // 1. Load Cybertruck GLB
             gltfLoader.load('fbx/cybertruck.glb', (gltf) => {
                 const object = gltf.scene;
@@ -485,8 +478,10 @@
             if (assetsLoaded >= assetsTotal) { 
                 document.getElementById('loading-text').style.display = 'none';
                 document.getElementById('progress-bar').parentElement.style.display = 'none';
-                const btn = document.getElementById('start-overlay');
-                btn.style.display = 'block'; // Reveal Start Button
+                // Auto-start game
+                document.getElementById('loading').style.display = 'none';
+                gameStarted = true;
+                // Audio initialized on first input now
             } 
         }
         
