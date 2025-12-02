@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Tesla Madness 1998 - Smooth Bass</title>
+    <title>Tesla Madness 1998 - FBX Moto</title>
     
     <script type="importmap">
     {
@@ -122,6 +122,23 @@
         .progress-track { width: 100%; height: 20px; background: #222; border: 1px solid #555; position: relative; }
         #progress-bar { width: 0%; height: 100%; background: #ffcc00; transition: width 0.2s; }
         #loading-text { color: #aaa; font-size: 12px; }
+        
+        /* START BUTTON (Overlay) */
+        #start-overlay {
+            display: none; 
+            margin-top: 10px;
+            padding: 15px 0;
+            width: 100%;
+            background: #ffcc00;
+            color: #000;
+            font-weight: bold;
+            font-size: 20px;
+            border: none;
+            cursor: pointer;
+            text-transform: uppercase;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
 
         /* CONTROLS */
         .touch-controls {
@@ -151,6 +168,7 @@
                 <div id="progress-bar"></div>
             </div>
             <div id="loading-text">LOADING ASSETS...</div>
+            <button id="start-overlay">TAP TO START</button>
         </div>
     </div>
 
@@ -194,7 +212,6 @@
     <script type="module">
         import * as THREE from 'three';
         import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
-        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
         let scene, camera, renderer;
@@ -209,13 +226,14 @@
         let lastTime = 0;
         let isAirborne = false;
         let assetsLoaded = 0;
-        let assetsTotal = 1; 
+        let assetsTotal = 1; // Moto FBX
         let obstacles = [];
         let gameStarted = false;
         
         let progressMoto = 0;
         let battery = 100;
         
+        // TUNING
         const BATTERY_DRAIN = 0.05; 
         const RING_CHARGE = 20;
         const MAX_SPEED = 1.4;
@@ -229,6 +247,27 @@
         let activeCameraMode = 0; 
         let analogSteering = 0;
         let analogThrottle = 0; 
+
+        // GLOBAL INPUT LISTENER TO WAKE UP AUDIO
+        function wakeUpAudio() {
+            if (sfx.ctx && sfx.ctx.state === 'suspended') {
+                sfx.ctx.resume().then(() => {
+                    sfx.playMusic();
+                });
+            } else if (sfx.ctx && sfx.ctx.state === 'running') {
+                sfx.playMusic();
+            } else {
+                sfx.init();
+                sfx.playMusic();
+            }
+            window.removeEventListener('touchstart', wakeUpAudio);
+            window.removeEventListener('keydown', wakeUpAudio);
+            window.removeEventListener('mousedown', wakeUpAudio);
+        }
+        window.addEventListener('touchstart', wakeUpAudio);
+        window.addEventListener('keydown', wakeUpAudio);
+        window.addEventListener('mousedown', wakeUpAudio);
+
 
         const joystick = {
             active: false, origin: { x: 0, y: 0 }, maxDist: 50,
@@ -280,21 +319,15 @@
                     const bufferSize = this.ctx.sampleRate * 2; this.noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
                     const data = this.noiseBuffer.getChannelData(0); for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
                     
-                    // ENGINE: Bassy Triangle
-                    this.engineOsc = this.ctx.createOscillator(); this.engineOsc.type = 'triangle'; this.engineOsc.frequency.value = 40; // Start low
+                    this.engineOsc = this.ctx.createOscillator(); this.engineOsc.type = 'triangle'; this.engineOsc.frequency.value = 60;
                     this.engineGain = this.ctx.createGain(); this.engineGain.gain.value = 0;
-                    this.filter = this.ctx.createBiquadFilter(); this.filter.type = 'lowpass'; this.filter.frequency.value = 120; // Muffle high end
+                    this.filter = this.ctx.createBiquadFilter(); this.filter.type = 'lowpass'; this.filter.frequency.value = 400;
                     this.engineOsc.connect(this.filter); this.filter.connect(this.engineGain); this.engineGain.connect(this.ctx.destination);
                     this.engineOsc.start();
 
-                    // SKID: Rumbly Square (Simulates tire friction)
-                    this.skidOsc = this.ctx.createOscillator(); this.skidOsc.type = 'square'; this.skidOsc.frequency.value = 60;
+                    this.skidOsc = this.ctx.createOscillator(); this.skidOsc.type = 'sawtooth'; this.skidOsc.frequency.value = 150;
                     this.skidGain = this.ctx.createGain(); this.skidGain.gain.value = 0;
-                    
-                    // Filter skid to be a rumble
-                    const skidFilter = this.ctx.createBiquadFilter(); skidFilter.type = 'lowpass'; skidFilter.frequency.value = 180;
-
-                    this.skidOsc.connect(skidFilter); skidFilter.connect(this.skidGain); this.skidGain.connect(this.ctx.destination);
+                    this.skidOsc.connect(this.skidGain); this.skidGain.connect(this.ctx.destination);
                     this.skidOsc.start();
 
                     this.bgm = new Audio('music/cybertruck.mp3'); 
@@ -321,32 +354,27 @@
             },
             updateEngine: function(speedPercent, isSkidding) {
                 if (!this.ctx || !this.isSfxOn) return;
-                // Engine Pitch: 40Hz to 100Hz
-                this.engineOsc.frequency.setTargetAtTime(40 + (speedPercent * 60), this.ctx.currentTime, 0.1);
-                const vol = (0.05 + (speedPercent * 0.1)) * 0.4; // Quieter
+                this.engineOsc.frequency.setTargetAtTime(60 + (speedPercent * 300), this.ctx.currentTime, 0.1);
+                const vol = (0.05 + (speedPercent * 0.1)) * 0.3; 
                 this.engineGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.1);
-                this.filter.frequency.setTargetAtTime(120 + (speedPercent * 200), this.ctx.currentTime, 0.1);
-                
-                // Skid
-                const targetSkidVol = isSkidding ? 0.1 : 0; // Subtle rumble
+                this.filter.frequency.setTargetAtTime(200 + (speedPercent * 3000), this.ctx.currentTime, 0.1);
+                const targetSkidVol = isSkidding ? 0.06 : 0;
                 this.skidGain.gain.setTargetAtTime(targetSkidVol, this.ctx.currentTime, 0.1);
-                // Vary skid rumble pitch slightly
-                this.skidOsc.frequency.setTargetAtTime(60 + Math.random()*20, this.ctx.currentTime, 0.1);
             },
             playCollect: function() {
                 if (!this.ctx || !this.isSfxOn) return;
                 const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
                 osc.type = 'sine'; osc.frequency.setValueAtTime(800, this.ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.2, this.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
                 osc.connect(gain); gain.connect(this.ctx.destination); osc.start(); osc.stop(this.ctx.currentTime + 0.5);
             },
             playLand: function(intensity) {
                 if (!this.ctx || !this.isSfxOn) return;
                 const src = this.ctx.createBufferSource(); src.buffer = this.noiseBuffer;
-                const gain = this.ctx.createGain(); gain.gain.setValueAtTime(Math.min(intensity * 0.4, 0.4), this.ctx.currentTime);
+                const gain = this.ctx.createGain(); gain.gain.setValueAtTime(Math.min(intensity * 0.5, 0.5), this.ctx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
                 const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(400, this.ctx.currentTime); filter.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.2);
+                filter.frequency.setValueAtTime(600, this.ctx.currentTime); filter.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.2);
                 src.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
                 src.start(); src.stop(this.ctx.currentTime + 0.3);
             }
@@ -369,37 +397,32 @@
             scene.add(dirLight);
 
             // Initialize BikeGroup immediately to prevent black screen crash
-            bikeGroup = new THREE.Group(); scene.add(bikeGroup); 
-            bikeVisuals = new THREE.Group(); bikeGroup.add(bikeVisuals);
+            bikeGroup = new THREE.Group(); 
+            bikeGroup.position.set(0, 10, 0); // Spawn in air to avoid ground clip
+            scene.add(bikeGroup); 
+            
+            bikeVisuals = new THREE.Group(); 
+            bikeGroup.add(bikeVisuals);
 
             createTerrain();
             createRings(); 
             loadModels();
 
             window.addEventListener('resize', onWindowResize);
-            document.addEventListener('keydown', (e) => { 
-                if(gameStarted) onKey(e, true); 
-                else {
-                    // Auto-start on first key
-                    document.getElementById('loading').style.display = 'none';
-                    gameStarted = true;
-                    sfx.init(); sfx.playMusic();
-                }
-            });
+            document.addEventListener('keydown', (e) => { if(gameStarted) onKey(e, true); });
             document.addEventListener('keyup', (e) => onKey(e, false));
-            
-            // Auto-start on touch
-            document.addEventListener('touchstart', () => {
-                 if(!gameStarted && assetsLoaded >= assetsTotal) {
-                    document.getElementById('loading').style.display = 'none';
-                    gameStarted = true;
-                    sfx.init(); sfx.playMusic();
-                 }
-            }, { once: true });
             
             document.getElementById('camera-indicator').addEventListener('click', (e) => { e.stopPropagation(); switchCamera(); });
             document.getElementById('music-indicator').addEventListener('click', (e) => { e.stopPropagation(); sfx.toggleMusic(); });
             document.getElementById('sfx-indicator').addEventListener('click', (e) => { e.stopPropagation(); sfx.toggleSfx(); });
+
+            // START BUTTON
+            document.getElementById('start-overlay').addEventListener('click', () => {
+                document.getElementById('loading').style.display = 'none';
+                gameStarted = true;
+                sfx.init(); 
+                sfx.playMusic();
+            });
 
             controls.init(); 
             animate();
@@ -431,13 +454,13 @@
         }
 
         function loadModels() {
-            const gltfLoader = new GLTFLoader();
+            const fbxLoader = new FBXLoader();
             
-            // 1. Load Cybertruck GLB with absolute path for robustness
-            const url = new URL('fbx/cybertruck.glb', document.baseURI).href;
-            
-            gltfLoader.load(url, (gltf) => {
-                const object = gltf.scene;
+            // 1. Load Moto FBX
+            // Use absolute URL hack to prevent blob errors
+            const url = new URL('fbx/moto.fbx', document.baseURI).href;
+
+            fbxLoader.load(url, (object) => {
                 object.scale.set(0.005, 0.005, 0.005); 
                 object.rotation.y = Math.PI; 
                 object.traverse((child) => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
@@ -447,24 +470,11 @@
                 checkLoading();
             }, (xhr) => { if (xhr.lengthComputable) { progressMoto = (xhr.loaded / xhr.total) * 100; updateProgress(); } else { progressMoto = 50; updateProgress(); }
             }, (error) => { 
-                console.warn("Cybertruck GLB missing.", error); 
-                // Attempt fallback to moto.fbx if GLB fails
-                const fbxLoader = new FBXLoader();
-                const fbxUrl = new URL('fbx/moto.fbx', document.baseURI).href;
-                fbxLoader.load(fbxUrl, (fbx) => {
-                     fbx.scale.set(0.005, 0.005, 0.005); 
-                     fbx.rotation.y = Math.PI;
-                     fbx.traverse((child) => { if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; } });
-                     bikeVisuals.add(fbx);
-                     addExhaust();
-                     assetsLoaded++;
-                     checkLoading();
-                }, undefined, (e) => {
-                    reportError("MODELS"); 
-                    createFallbackBike(); 
-                    assetsLoaded++; 
-                    checkLoading(); 
-                });
+                console.warn("Moto FBX missing.", error); 
+                reportError("moto.fbx"); 
+                createFallbackBike(); 
+                assetsLoaded++; 
+                checkLoading(); 
             });
 
             // 2. PROCEDURAL TREES ONLY
@@ -505,7 +515,8 @@
             if (assetsLoaded >= assetsTotal) { 
                 document.getElementById('loading-text').style.display = 'none';
                 document.getElementById('progress-bar').parentElement.style.display = 'none';
-                // Auto-Start Trigger Logic in listeners
+                const btn = document.getElementById('start-overlay');
+                btn.style.display = 'block'; // Reveal Start Button
             } 
         }
         
@@ -715,6 +726,7 @@
 
             createDust(); updateParticles();
             document.getElementById('speed').innerText = Math.abs(Math.round(speed * 100)) + " KM/H";
+            renderer.render(scene, camera);
         }
 
         init();
