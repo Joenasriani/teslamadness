@@ -144,6 +144,32 @@
         #loading-text { color: #aaa; font-size: 12px; }
         .error-msg { color: #ff3333 !important; }
 
+        /* MINIMAP */
+        #minimap-container {
+            position: absolute;
+            bottom: max(20px, env(safe-area-inset-bottom));
+            right: max(20px, env(safe-area-inset-right));
+            width: 150px;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #ffcc00;
+            border-radius: 8px;
+            z-index: 90;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        #minimap-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        #objective-text {
+            margin-top: 5px;
+            font-size: 10px;
+            color: #aaa;
+            text-align: right;
+        }
+
         /* --- MOBILE CONTROLS --- */
         .touch-controls {
             position: absolute;
@@ -222,6 +248,19 @@
             content: "BRAKE";
         }
 
+        /* END GAME MESSAGE */
+        #win-msg {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            border: 4px solid #00ff00;
+            padding: 40px;
+            text-align: center;
+            color: #fff;
+            display: none;
+            z-index: 200;
+        }
     </style>
 </head>
 <body>
@@ -234,6 +273,12 @@
         <div id="loading-text">LOADING ASSETS...</div>
     </div>
 
+    <div id="win-msg">
+        <h1 style="color:#00ff00; font-size:40px;">MISSION COMPLETE</h1>
+        <p>YOU REACHED THE EXTRACTION POINT</p>
+        <div class="hud-btn" onclick="location.reload()" style="margin-top:20px; display:inline-block;">REPLAY</div>
+    </div>
+
     <!-- LEFT HEADER -->
     <div id="ui-layer">
         <h1>CYBERTRUCK MADNESS '98</h1>
@@ -241,7 +286,7 @@
             <div id="battery-bar"></div>
             <div id="battery-text">BATTERY: 100%</div>
         </div>
-        <p>Collect <span style="color: #ffcc00;">Gold Rings</span> to Recharge</p>
+        <p id="rings-status">Collect <span style="color: #ffcc00;">Gold Rings</span> to Recharge</p>
     </div>
 
     <!-- RIGHT HEADER -->
@@ -253,6 +298,13 @@
         <div id="camera-indicator" class="hud-btn">CAM: FAR CHASE</div>
         <div id="music-indicator" class="hud-btn">MUSIC: ON</div>
         <div id="sfx-indicator" class="hud-btn">SFX: ON</div>
+        
+        <div id="objective-text">RINGS: 0 / 500</div>
+    </div>
+
+    <!-- MINIMAP -->
+    <div id="minimap-container">
+        <canvas id="minimap-canvas" width="150" height="150"></canvas>
     </div>
 
     <!-- CONTROLS -->
@@ -304,6 +356,20 @@
         let battery = 100;
         const BATTERY_DRAIN = 0.05; 
         const RING_CHARGE = 20;
+
+        // --- NEW MAP & WIN LOGIC ---
+        const TOTAL_RINGS = 500;
+        const WIN_PCT = 0.90;
+        const REQUIRED_RINGS = Math.floor(TOTAL_RINGS * WIN_PCT);
+        let collectedCount = 0;
+        let exitUnlocked = false;
+        let exitBeacon = null;
+        // Place exit far away
+        const EXIT_POS = { x: 4500, z: 4500 }; 
+        const MAP_SIZE = 10000; // Match terrain size
+
+        const minimapCanvas = document.getElementById('minimap-canvas');
+        const mapCtx = minimapCanvas.getContext('2d');
 
         const MAX_SPEED = 1.2;
         const ACCEL = 0.02;
@@ -557,6 +623,7 @@
 
             createTerrain();
             createRings(); 
+            createExitBeacon(); // Add hidden exit
             loadModels();
 
             window.addEventListener('resize', onWindowResize);
@@ -610,6 +677,17 @@
             return calculateTerrainHeight(x, z);
         }
 
+        function createExitBeacon() {
+            const geo = new THREE.CylinderGeometry(0, 1, 100, 8);
+            geo.translate(0, 50, 0);
+            const mat = new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.5 });
+            exitBeacon = new THREE.Mesh(geo, mat);
+            const y = getTerrainHeight(EXIT_POS.x, EXIT_POS.z);
+            exitBeacon.position.set(EXIT_POS.x, y, EXIT_POS.z);
+            exitBeacon.visible = false;
+            scene.add(exitBeacon);
+        }
+
         function createRings() {
             const geo = new THREE.TorusGeometry(0.8, 0.15, 8, 16);
             const mat = new THREE.MeshStandardMaterial({ 
@@ -617,11 +695,32 @@
             });
 
             // MODIFIED: Increased to 500 rings and 9500 spread
-            for(let i=0; i<500; i++) {
+            for(let i=0; i<TOTAL_RINGS; i++) {
+                // Intelligent placement loop
+                let valid = false;
+                let x, z, y;
+                let attempts = 0;
+                
+                while(!valid && attempts < 5) {
+                    x = (Math.random() - 0.5) * 9500;
+                    z = (Math.random() - 0.5) * 9500;
+                    
+                    // Check against rocks (simple distance check)
+                    let collision = false;
+                    for(let obs of obstacles) {
+                        const dx = x - obs.x;
+                        const dz = z - obs.z;
+                        if(dx*dx + dz*dz < (obs.radius + 2)*(obs.radius + 2)) {
+                            collision = true;
+                            break;
+                        }
+                    }
+                    if(!collision) valid = true;
+                    attempts++;
+                }
+
+                y = getTerrainHeight(x, z);
                 const ring = new THREE.Mesh(geo, mat);
-                const x = (Math.random() - 0.5) * 9500;
-                const z = (Math.random() - 0.5) * 9500;
-                const y = getTerrainHeight(x, z);
                 ring.position.set(x, y + 0.2, z); 
                 ring.rotation.y = Math.random() * Math.PI;
                 ring.castShadow = true;
@@ -843,6 +942,8 @@
 
         function checkRings() {
             const playerPos = bikeGroup.position;
+            let collectedInFrame = false;
+            
             for(let i = rings.length - 1; i >= 0; i--) {
                 const ring = rings[i];
                 ring.rotation.y += 0.05; 
@@ -852,7 +953,34 @@
                 const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
 
                 if (dist < 2.0) {
-                    scene.remove(ring); rings.splice(i, 1); sfx.playCollect(); battery = Math.min(100, battery + RING_CHARGE);
+                    scene.remove(ring); 
+                    rings.splice(i, 1); 
+                    collectedCount++;
+                    collectedInFrame = true;
+                    sfx.playCollect(); 
+                    battery = Math.min(100, battery + RING_CHARGE);
+                }
+            }
+
+            if(collectedInFrame) {
+                // Update text
+                document.getElementById('objective-text').innerText = `RINGS: ${collectedCount} / ${TOTAL_RINGS}`;
+                // Check Win Condition
+                if(collectedCount >= REQUIRED_RINGS && !exitUnlocked) {
+                    exitUnlocked = true;
+                    exitBeacon.visible = true;
+                    document.getElementById('rings-status').innerText = "TARGET UNLOCKED: GO TO GREEN BEACON!";
+                    document.getElementById('rings-status').classList.add('accent');
+                }
+            }
+
+            // Check Exit
+            if(exitUnlocked) {
+                const exDx = playerPos.x - EXIT_POS.x;
+                const exDz = playerPos.z - EXIT_POS.z;
+                if(Math.sqrt(exDx*exDx + exDz*exDz) < 10) {
+                    document.getElementById('win-msg').style.display = 'block';
+                    speed = 0;
                 }
             }
         }
@@ -870,6 +998,53 @@
             
             if (battery <= 0) {
                 speed *= 0.95; 
+            }
+        }
+
+        function drawMinimap() {
+            mapCtx.clearRect(0, 0, 150, 150);
+            
+            // Map world coords (-5000 to 5000) to (0 to 150)
+            const mapScale = 150 / MAP_SIZE;
+            const centerOffset = 75; // 150/2
+
+            // Draw Exit if unlocked
+            if(exitUnlocked) {
+                mapCtx.fillStyle = '#00ff00';
+                const exX = (EXIT_POS.x * mapScale) + centerOffset;
+                const exY = (EXIT_POS.z * mapScale) + centerOffset;
+                mapCtx.beginPath();
+                mapCtx.arc(exX, exY, 4, 0, Math.PI * 2);
+                mapCtx.fill();
+            }
+
+            // Draw Rings
+            mapCtx.fillStyle = '#ffcc00';
+            for(let ring of rings) {
+                const rx = (ring.position.x * mapScale) + centerOffset;
+                const ry = (ring.position.z * mapScale) + centerOffset;
+                mapCtx.beginPath();
+                mapCtx.rect(rx-1, ry-1, 2, 2);
+                mapCtx.fill();
+            }
+
+            // Draw Player
+            if(bikeGroup) {
+                mapCtx.fillStyle = '#ffffff';
+                const px = (bikeGroup.position.x * mapScale) + centerOffset;
+                const py = (bikeGroup.position.z * mapScale) + centerOffset;
+                
+                // Draw Arrow
+                mapCtx.save();
+                mapCtx.translate(px, py);
+                mapCtx.rotate(-bikeGroup.rotation.y); // Rotate opposite to mesh to show direction
+                mapCtx.beginPath();
+                mapCtx.moveTo(0, -3);
+                mapCtx.lineTo(2, 2);
+                mapCtx.lineTo(-2, 2);
+                mapCtx.closePath();
+                mapCtx.fill();
+                mapCtx.restore();
             }
         }
 
@@ -949,6 +1124,7 @@
                 sfx.updateEngine(Math.abs(speed), isDrifting);
                 checkRings();
                 updateBattery();
+                drawMinimap(); // UPDATE MAP
 
                 // Terrain Following
                 // Use fast math here too
