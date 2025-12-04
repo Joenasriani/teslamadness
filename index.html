@@ -39,7 +39,7 @@
             max-width: 50%;
             display: flex;
             flex-direction: column;
-            gap: 8px; /* Increased gap for better spacing */
+            gap: 15px; /* MODIFIED: Increased gap for clear spacing */
         }
         
         h1 { 
@@ -51,12 +51,12 @@
             white-space: nowrap; 
             line-height: 1.2;
         }
-        p { margin: 0; font-size: clamp(9px, 2.5vw, 14px); color: #fff; } /* Removed margin for better stacking */
+        p { margin: 0; font-size: clamp(9px, 2.5vw, 14px); color: #fff; } 
         .accent { color: #00ff00; }
 
         /* BATTERY BAR */
         .battery-container {
-            margin: 0; /* Removed margin */
+            margin: 0; 
             width: 100%;
             height: 12px;
             background: rgba(0,0,0,0.5);
@@ -311,7 +311,7 @@
         const BRAKE_FRICTION = 0.92; 
         const TURN_SPEED = 0.04;
         const GRAVITY = 0.04; 
-        const MAP_LIMIT = 195; 
+        // const MAP_LIMIT = 195; // REMOVED FOR INFINITE FEEL
         
         const keys = { w: false, a: false, s: false, d: false, space: false, brake: false };
         
@@ -437,14 +437,11 @@
                 this.skidGain.connect(this.ctx.destination);
                 this.skidOsc.start();
 
-                // --- MUSIC PLAYLIST SETUP ---
-                // Add the exact filenames of the MP3s in your "music" folder here.
-                // The game will pick one at random on start.
+                // --- MODIFIED: MUSIC PLAYLIST SETUP ---
                 const playlist = [
+                    "Cybertruking.mp3",
                     "cybertruck.mp3",
-                    "track1.mp3",
-                    "track2.mp3",
-                    "techno.mp3"
+                    "Cybertruck - The Electric Juggernaut.mp3"
                 ];
 
                 const randomTrack = playlist[Math.floor(Math.random() * playlist.length)];
@@ -530,7 +527,8 @@
                 osc.type = 'square';
                 osc.frequency.setValueAtTime(220, this.ctx.currentTime);
                 osc.frequency.exponentialRampToValueAtTime(440, this.ctx.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                // MODIFIED: Reduced volume from 0.3 to 0.12 (60% reduction)
+                gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
                 osc.connect(gain); gain.connect(this.ctx.destination);
                 osc.start(); osc.stop(this.ctx.currentTime + 0.5);
@@ -557,6 +555,7 @@
             loadModels();
 
             window.addEventListener('resize', onWindowResize);
+            // MODIFIED: Added spacebar mapping logic in onKey
             document.addEventListener('keydown', (e) => { onKey(e, true); sfx.init(); sfx.playMusic(); });
             document.addEventListener('keyup', (e) => onKey(e, false));
             
@@ -592,10 +591,11 @@
                 color: 0xFFFF00, metalness: 0.1, roughness: 0.2, emissive: 0xFFFF00, emissiveIntensity: 0.8
             });
 
-            for(let i=0; i<20; i++) {
+            // MODIFIED: Increased spread for larger map
+            for(let i=0; i<60; i++) {
                 const ring = new THREE.Mesh(geo, mat);
-                const x = (Math.random() - 0.5) * 300;
-                const z = (Math.random() - 0.5) * 300;
+                const x = (Math.random() - 0.5) * 4000;
+                const z = (Math.random() - 0.5) * 4000;
                 const y = getTerrainHeight(x, z);
                 ring.position.set(x, y + 0.2, z); 
                 ring.rotation.y = Math.random() * Math.PI;
@@ -621,52 +621,83 @@
             }, (xhr) => { if (xhr.lengthComputable) { progressMoto = (xhr.loaded / xhr.total) * 100; updateProgress(); } else { progressMoto = 50; updateProgress(); }
             }, (error) => { console.warn("Moto FBX missing."); reportError("moto.fbx"); createFallbackBike(); assetsLoaded++; checkLoading(); });
 
-            // 2. Load FBX Tree (Increased count from 40 to 80)
-            loader.load('fbx/Tree.fbx', (object) => {
-                const count = 80; 
-                const dummy = new THREE.Object3D();
-                const transforms = [];
-                for(let i=0; i<count; i++) {
-                    const x = (Math.random() - 0.5) * 200;
-                    const z = (Math.random() - 0.5) * 200;
-                    if (Math.abs(x) < 20 && Math.abs(z) < 20) { i--; continue; } 
-                    const y = getTerrainHeight(x, z);
-                    const s = 0.015 * (0.8 + Math.random() * 0.5); 
-                    dummy.position.set(x, y, z);
-                    dummy.rotation.set(0, Math.random() * Math.PI * 2, 0); 
-                    dummy.scale.set(s, s, s);
-                    dummy.updateMatrix();
-                    transforms.push(dummy.matrix.clone());
-                    obstacles.push({ x: x, z: z, radius: 1.5 });
-                }
-                object.traverse((child) => {
-                    if (child.isMesh) {
-                        const instancedMesh = new THREE.InstancedMesh(child.geometry, child.material, count);
-                        instancedMesh.castShadow = true;
-                        instancedMesh.receiveShadow = true;
-                        // DISABLED FRUSTUM CULLING TO PREVENT INVISIBLE WALLS
-                        instancedMesh.frustumCulled = false;
-                        for(let i=0; i<count; i++) instancedMesh.setMatrixAt(i, transforms[i]);
-                        instancedMesh.instanceMatrix.needsUpdate = true;
-                        scene.add(instancedMesh);
-                    }
-                });
-                assetsLoaded++;
-                checkLoading();
-            }, (xhr) => { if (xhr.lengthComputable) { progressTree = (xhr.loaded / xhr.total) * 100; updateProgress(); } else { progressTree = 50; updateProgress(); }
-            }, (err) => { console.warn("Tree FBX missing."); reportError("Tree.fbx"); /* createFallbackTrees(); REMOVED */ assetsLoaded++; checkLoading(); });
+            // 2. High Res Procedural Trees
+            createHighResTrees();
 
-            // createProceduralPines(); REMOVED
             createRocks();
             // Removed createFences call
         }
 
-        // function createProceduralPines() { ... } REMOVED
+        function createHighResTrees() {
+            // MODIFIED: Increased count to 3000 for denser environment
+            const count = 3000; 
+            const dummy = new THREE.Object3D();
+            
+            // Trunk: Detailed cylinder
+            const trunkGeo = new THREE.CylinderGeometry(0.3, 0.5, 2.5, 8); 
+            trunkGeo.translate(0, 1.25, 0); // Pivot at bottom
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5C4033, roughness: 0.9 });
+            const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
+
+            // Foliage: Stack of 3 high-res cones
+            const c1 = new THREE.ConeGeometry(2.0, 2.5, 8); c1.translate(0, 3.0, 0);
+            const c2 = new THREE.ConeGeometry(1.6, 2.2, 8); c2.translate(0, 4.2, 0);
+            const c3 = new THREE.ConeGeometry(1.0, 1.8, 8); c3.translate(0, 5.2, 0);
+            
+            const leafGeo = BufferGeometryUtils.mergeGeometries([c1, c2, c3]);
+            const leafMat = new THREE.MeshStandardMaterial({ color: 0x228B22, roughness: 0.8, flatShading: false });
+            const leafMesh = new THREE.InstancedMesh(leafGeo, leafMat, count);
+
+            // Set Shadows & Frustum
+            trunkMesh.castShadow = true; trunkMesh.receiveShadow = true; trunkMesh.frustumCulled = false;
+            leafMesh.castShadow = true; leafMesh.receiveShadow = true; leafMesh.frustumCulled = false;
+
+            for(let i=0; i<count; i++) {
+                // Random position
+                // MODIFIED: Increased spread for "no ending" feel
+                const x = (Math.random() - 0.5) * 9500; 
+                const z = (Math.random() - 0.5) * 9500;
+                
+                // Clear center spawn area
+                if(Math.abs(x) < 25 && Math.abs(z) < 25) { 
+                    // Hide under map if in spawn
+                    dummy.position.set(0, -100, 0); 
+                    dummy.updateMatrix();
+                    trunkMesh.setMatrixAt(i, dummy.matrix);
+                    leafMesh.setMatrixAt(i, dummy.matrix);
+                    continue; 
+                }
+
+                const y = getTerrainHeight(x, z);
+                
+                // Random Scale (respecting game proportions)
+                // Base size fits the ~1 unit long bike
+                const scale = 0.8 + Math.random() * 0.8; 
+                
+                dummy.position.set(x, y, z);
+                dummy.rotation.set(0, Math.random() * Math.PI * 2, 0);
+                dummy.scale.set(scale, scale, scale);
+                dummy.updateMatrix();
+
+                trunkMesh.setMatrixAt(i, dummy.matrix);
+                leafMesh.setMatrixAt(i, dummy.matrix);
+                
+                // Add to collision
+                obstacles.push({ x: x, z: z, radius: 1.5 * scale });
+            }
+            
+            scene.add(trunkMesh);
+            scene.add(leafMesh);
+            
+            // Mark trees as "loaded"
+            assetsLoaded++;
+            checkLoading();
+        }
         
         function createFallbackBike() {
             const geo = new THREE.BoxGeometry(0.5, 0.5, 1); const mat = new THREE.MeshStandardMaterial({color: 0xff0000}); const mesh = new THREE.Mesh(geo, mat); mesh.position.y = 0.5; bikeGroup.add(mesh); addExhaust();
         }
-        // function createFallbackTrees() { ... } REMOVED
+        
         function addExhaust() { const exhaustPoint = new THREE.Object3D(); exhaustPoint.position.set(0, 0.5, -1.2); exhaustPoint.name = "exhaust"; bikeGroup.add(exhaustPoint); }
         function checkLoading() { 
             if (assetsLoaded >= assetsTotal) { 
@@ -687,7 +718,8 @@
         }
 
         function createTerrain() {
-            const geometry = new THREE.PlaneGeometry(400, 400, 400, 400); geometry.rotateX(-Math.PI / 2); const positions = geometry.attributes.position.array;
+            // MODIFIED: Increased plane size to 10000x10000 for seamless infinite feel
+            const geometry = new THREE.PlaneGeometry(10000, 10000, 200, 200); geometry.rotateX(-Math.PI / 2); const positions = geometry.attributes.position.array;
             for (let i = 0; i < positions.length; i += 3) {
                 const x = positions[i]; const z = positions[i + 2];
                 const y = (Math.sin(x * 0.03) * 5) + (Math.cos(z * 0.03) * 5) + (Math.sin(x * 0.1 + z * 0.1) * 1.5) + (Math.random() * 0.2);
@@ -700,7 +732,9 @@
                 const shade = Math.random(); if(shade > 0.6) ctx.fillStyle = '#A07040'; else if (shade > 0.3) ctx.fillStyle = '#5C4033'; else ctx.fillStyle = '#556B2F';
                 const x = Math.random() * 1024; const y = Math.random() * 1024; const size = Math.random() * 3 + 1; ctx.fillRect(x, y, size, size);
             }
-            const tex = new THREE.CanvasTexture(canvas); tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(10, 10);
+            const tex = new THREE.CanvasTexture(canvas); tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; 
+            // MODIFIED: Increased repeats so texture doesn't stretch
+            tex.repeat.set(100, 100);
             const material = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 });
             terrainMesh = new THREE.Mesh(geometry, material); terrainMesh.receiveShadow = true; scene.add(terrainMesh);
         }
@@ -709,7 +743,19 @@
         
         function createRocks() {
              const rockGeo = new THREE.DodecahedronGeometry(1, 0); const rockMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.9 });
-            for(let i=0; i< 30; i++) { const x = (Math.random() - 0.5) * 350; const z = (Math.random() - 0.5) * 350; const y = getTerrainHeight(x, z); const rock = new THREE.Mesh(rockGeo, rockMat); rock.position.set(x, y + 0.5, z); rock.scale.set(1 + Math.random(), 1 + Math.random(), 1 + Math.random()); rock.rotation.set(Math.random(), Math.random(), Math.random()); rock.castShadow = true; scene.add(rock); obstacles.push({ x: x, z: z, radius: 1.0 }); }
+            // MODIFIED: Increased rocks for large map
+            for(let i=0; i< 200; i++) { 
+                const x = (Math.random() - 0.5) * 9000; 
+                const z = (Math.random() - 0.5) * 9000; 
+                const y = getTerrainHeight(x, z); 
+                const rock = new THREE.Mesh(rockGeo, rockMat); 
+                rock.position.set(x, y + 0.5, z); 
+                rock.scale.set(1 + Math.random(), 1 + Math.random(), 1 + Math.random()); 
+                rock.rotation.set(Math.random(), Math.random(), Math.random()); 
+                rock.castShadow = true; 
+                scene.add(rock); 
+                obstacles.push({ x: x, z: z, radius: 1.0 }); 
+            }
         }
         
         function createDriftSmoke(intensity) {
@@ -763,7 +809,15 @@
                 } 
             } 
         }
-        function onKey(e, pressed) { const k = e.key.toLowerCase(); if (k === 'w' || k === 'arrowup') keys.w = pressed; if (k === 's' || k === 'arrowdown') keys.s = pressed; if (k === 'a' || k === 'arrowleft') keys.a = pressed; if (k === 'd' || k === 'arrowright') keys.d = pressed; if (k === ' ') keys.space = pressed; }
+        function onKey(e, pressed) { 
+            const k = e.key.toLowerCase(); 
+            if (k === 'w' || k === 'arrowup') keys.w = pressed; 
+            if (k === 's' || k === 'arrowdown') keys.s = pressed; 
+            if (k === 'a' || k === 'arrowleft') keys.a = pressed; 
+            if (k === 'd' || k === 'arrowright') keys.d = pressed; 
+            // MODIFIED: Map Space to Brake for Desktop Drift
+            if (k === ' ') keys.brake = pressed; 
+        }
         
         function switchCamera() { 
             activeCameraMode = (activeCameraMode + 1) % 2; 
@@ -911,8 +965,6 @@
                 } else { 
                     bikeGroup.position.add(totalVec);
                 }
-
-                // REMOVED WALLS (Infinite Map)
 
                 sfx.updateEngine(Math.abs(speed), isDrifting);
                 checkRings();
