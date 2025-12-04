@@ -802,16 +802,24 @@
                 color: 0xFFFF00, metalness: 0.1, roughness: 0.2, emissive: 0xFFFF00, emissiveIntensity: 0.8
             });
 
-            // MODIFIED: Increased to 500 rings and 9500 spread
+            // MODIFIED: Zoning for easier start
+            // 30% of rings spawn closer to center
+            const EASY_ZONE_COUNT = Math.floor(TOTAL_RINGS * 0.3);
+            const EASY_RANGE = 2000;
+            const FULL_RANGE = 9500;
+
             for(let i=0; i<TOTAL_RINGS; i++) {
                 // Intelligent placement loop
                 let valid = false;
                 let x, z, y;
                 let attempts = 0;
                 
+                // Select range
+                const range = (i < EASY_ZONE_COUNT) ? EASY_RANGE : FULL_RANGE;
+
                 while(!valid && attempts < 5) {
-                    x = (Math.random() - 0.5) * 9500;
-                    z = (Math.random() - 0.5) * 9500;
+                    x = (Math.random() - 0.5) * range;
+                    z = (Math.random() - 0.5) * range;
                     
                     // Check against rocks (simple distance check)
                     let collision = false;
