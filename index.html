@@ -39,7 +39,7 @@
             max-width: 50%;
             display: flex;
             flex-direction: column;
-            gap: 2px;
+            gap: 8px; /* Increased gap for better spacing */
         }
         
         h1 { 
@@ -51,14 +51,13 @@
             white-space: nowrap; 
             line-height: 1.2;
         }
-        p { margin: 5px 0; font-size: clamp(9px, 2.5vw, 14px); color: #fff; }
+        p { margin: 0; font-size: clamp(9px, 2.5vw, 14px); color: #fff; } /* Removed margin for better stacking */
         .accent { color: #00ff00; }
 
         /* BATTERY BAR */
         .battery-container {
-            margin-top: 25px; 
+            margin: 0; /* Removed margin */
             width: 100%;
-            max-width: 200px;
             height: 12px;
             background: rgba(0,0,0,0.5);
             border: 1px solid #fff;
@@ -242,7 +241,7 @@
             <div id="battery-bar"></div>
             <div id="battery-text">BATTERY: 100%</div>
         </div>
-        <p>COLLECT <span style="color:gold">GOLD RINGS</span></p>
+        <p>Collect Gold Rings to Recharge</p>
     </div>
 
     <!-- RIGHT HEADER -->
@@ -423,26 +422,42 @@
                 const data = this.noiseBuffer.getChannelData(0);
                 for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
                 
-                this.engineOsc = this.ctx.createOscillator(); this.engineOsc.type = 'triangle'; this.engineOsc.frequency.value = 60;
+                this.engineOsc = this.ctx.createOscillator(); this.engineOsc.type = 'sawtooth'; this.engineOsc.frequency.value = 40;
                 this.engineGain = this.ctx.createGain(); this.engineGain.gain.value = 0;
-                this.filter = this.ctx.createBiquadFilter(); this.filter.type = 'lowpass'; this.filter.frequency.value = 400;
+                this.filter = this.ctx.createBiquadFilter(); this.filter.type = 'lowpass'; this.filter.frequency.value = 150;
                 this.engineOsc.connect(this.filter); this.filter.connect(this.engineGain); this.engineGain.connect(this.ctx.destination);
                 this.engineOsc.start();
 
                 this.skidOsc = this.ctx.createOscillator();
                 this.skidOsc.type = 'sawtooth';
-                this.skidOsc.frequency.value = 150;
+                this.skidOsc.frequency.value = 80;
                 this.skidGain = this.ctx.createGain();
                 this.skidGain.gain.value = 0;
                 this.skidOsc.connect(this.skidGain);
                 this.skidGain.connect(this.ctx.destination);
                 this.skidOsc.start();
 
-                // Music Setup
-                // Note: This URL will likely fail in this environment, but the catch block below handles it.
-                this.bgm = new Audio('music/cybertruck.mp3');
+                // --- MUSIC PLAYLIST SETUP ---
+                // Add the exact filenames of the MP3s in your "music" folder here.
+                // The game will pick one at random on start.
+                const playlist = [
+                    "cybertruck.mp3",
+                    "track1.mp3",
+                    "track2.mp3",
+                    "techno.mp3"
+                ];
+
+                const randomTrack = playlist[Math.floor(Math.random() * playlist.length)];
+                console.log("Playing:", randomTrack);
+
+                this.bgm = new Audio('music/' + randomTrack);
                 this.bgm.loop = true;
                 this.bgm.volume = 0.6;
+                
+                // Error handling in case file doesn't exist
+                this.bgm.addEventListener('error', (e) => {
+                    console.warn("Music file not found: music/" + randomTrack);
+                });
             },
             
             playMusic: function() {
@@ -485,14 +500,14 @@
             updateEngine: function(speedPercent, isSkidding) {
                 if (!this.ctx || !this.isSfxOn) return;
 
-                this.engineOsc.frequency.setTargetAtTime(60 + (speedPercent * 300), this.ctx.currentTime, 0.1);
+                this.engineOsc.frequency.setTargetAtTime(40 + (speedPercent * 110), this.ctx.currentTime, 0.1);
                 const vol = (0.05 + (speedPercent * 0.1)) * 0.3; 
                 this.engineGain.gain.setTargetAtTime(vol, this.ctx.currentTime, 0.1);
-                this.filter.frequency.setTargetAtTime(200 + (speedPercent * 3000), this.ctx.currentTime, 0.1);
+                this.filter.frequency.setTargetAtTime(100 + (speedPercent * 600), this.ctx.currentTime, 0.1);
 
                 if(isSkidding) {
                     this.skidGain.gain.setTargetAtTime(0.06, this.ctx.currentTime, 0.1);
-                    this.skidOsc.frequency.setTargetAtTime(150 + Math.random()*100, this.ctx.currentTime, 0.1);
+                    this.skidOsc.frequency.setTargetAtTime(80 + Math.random()*50, this.ctx.currentTime, 0.1);
                 } else {
                     this.skidGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
                 }
@@ -504,7 +519,7 @@
                 const gain = this.ctx.createGain(); gain.gain.setValueAtTime(Math.min(intensity * 0.5, 0.5), this.ctx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
                 const filter = this.ctx.createBiquadFilter(); filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(600, this.ctx.currentTime); filter.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.2);
+                filter.frequency.setValueAtTime(300, this.ctx.currentTime); filter.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.2);
                 src.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
                 src.start(); src.stop(this.ctx.currentTime + 0.3);
             },
@@ -512,9 +527,9 @@
                 if (!this.ctx || !this.isSfxOn) return;
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(800, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.1);
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(220, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(440, this.ctx.currentTime + 0.1);
                 gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
                 osc.connect(gain); gain.connect(this.ctx.destination);
@@ -639,51 +654,19 @@
                 assetsLoaded++;
                 checkLoading();
             }, (xhr) => { if (xhr.lengthComputable) { progressTree = (xhr.loaded / xhr.total) * 100; updateProgress(); } else { progressTree = 50; updateProgress(); }
-            }, (err) => { console.warn("Tree FBX missing."); reportError("Tree.fbx"); createFallbackTrees(); assetsLoaded++; checkLoading(); });
+            }, (err) => { console.warn("Tree FBX missing."); reportError("Tree.fbx"); /* createFallbackTrees(); REMOVED */ assetsLoaded++; checkLoading(); });
 
-            createProceduralPines();
+            // createProceduralPines(); REMOVED
             createRocks();
             // Removed createFences call
         }
 
-        function createProceduralPines() {
-            const trunkGeo = new THREE.CylinderGeometry(0.2, 0.4, 1.5, 5); trunkGeo.translate(0, 0.75, 0);
-            const leaves1 = new THREE.ConeGeometry(1.2, 1.5, 5); leaves1.translate(0, 2.0, 0);
-            const leaves2 = new THREE.ConeGeometry(0.9, 1.2, 5); leaves2.translate(0, 2.8, 0);
-            const leaves3 = new THREE.ConeGeometry(0.6, 1.0, 5); leaves3.translate(0, 3.5, 0);
-            // Increased count from 40 to 80
-            const count = 80;
-            const dummy = new THREE.Object3D();
-            const trunkMat = new THREE.MeshStandardMaterial({color: 0x3d2817});
-            const leafMat = new THREE.MeshStandardMaterial({color: 0x1a472a});
-            const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
-            const leafGeo = BufferGeometryUtils.mergeGeometries([leaves1, leaves2, leaves3]);
-            const leafMesh = new THREE.InstancedMesh(leafGeo, leafMat, count);
-            
-            // DISABLED FRUSTUM CULLING TO PREVENT INVISIBLE WALLS
-            trunkMesh.frustumCulled = false;
-            leafMesh.frustumCulled = false;
-
-            trunkMesh.castShadow = true; trunkMesh.receiveShadow = true;
-            leafMesh.castShadow = true; leafMesh.receiveShadow = true;
-            for(let i=0; i<count; i++) {
-                const x = (Math.random() - 0.5) * 300; const z = (Math.random() - 0.5) * 300;
-                if(Math.abs(x) < 20 && Math.abs(z) < 20) { i--; continue; }
-                const y = getTerrainHeight(x, z); const s = 1.0 + Math.random() * 0.5;
-                dummy.position.set(x, y, z); dummy.rotation.y = Math.random() * Math.PI; dummy.scale.set(s,s,s); dummy.updateMatrix();
-                trunkMesh.setMatrixAt(i, dummy.matrix); leafMesh.setMatrixAt(i, dummy.matrix);
-                obstacles.push({x:x, z:z, radius: 1.0});
-            }
-            scene.add(trunkMesh); scene.add(leafMesh);
-        }
-
+        // function createProceduralPines() { ... } REMOVED
+        
         function createFallbackBike() {
             const geo = new THREE.BoxGeometry(0.5, 0.5, 1); const mat = new THREE.MeshStandardMaterial({color: 0xff0000}); const mesh = new THREE.Mesh(geo, mat); mesh.position.y = 0.5; bikeGroup.add(mesh); addExhaust();
         }
-        function createFallbackTrees() {
-            const geo = new THREE.ConeGeometry(1, 4, 8); const mat = new THREE.MeshStandardMaterial({color: 0x00ff00});
-            for(let i=0; i<30; i++) { const x = (Math.random() - 0.5) * 200; const z = (Math.random() - 0.5) * 200; const y = getTerrainHeight(x, z); const mesh = new THREE.Mesh(geo, mat); mesh.position.set(x, y+2, z); scene.add(mesh); obstacles.push({ x: x, z: z, radius: 1.5 }); }
-        }
+        // function createFallbackTrees() { ... } REMOVED
         function addExhaust() { const exhaustPoint = new THREE.Object3D(); exhaustPoint.position.set(0, 0.5, -1.2); exhaustPoint.name = "exhaust"; bikeGroup.add(exhaustPoint); }
         function checkLoading() { 
             if (assetsLoaded >= assetsTotal) { 
@@ -846,74 +829,79 @@
             
             let turnInput = 0; if (keys.a) turnInput += 1; if (keys.d) turnInput -= 1; turnInput += analogSteering; 
 
-            // --- ADVANCED DRIFT PHYSICS 2.0 ---
+            // --- ADVANCED MOTO DRIFT PHYSICS 3.0 ---
             
-            // 1. Calculate how quickly the player is changing direction (Initiation Snap)
-            // If previous input was 0 and now is 1, delta is 1. 
-            // If switching from -1 to 1, delta is 2 (Huge snap).
-            const turnDelta = Math.abs(turnInput - lastTurnInput);
+            // 1. Input Smoothing
+            const turnDelta = turnInput - lastTurnInput;
             lastTurnInput = turnInput;
 
             let isDrifting = false;
 
-            // 2. Drift Initiation Logic
-            // Needs speed (> 0.3) AND Brake held.
-            if (keys.brake && Math.abs(speed) > 0.3) {
+            // Physics Constants
+            const MIN_DRIFT_SPEED = 0.25;
+            const GRIP_FRICTION = 0.85;  // Tires grip road quickly when not sliding
+            const DRIFT_FRICTION = 0.985; // Tires slide like butter when drifting
+
+            // 2. Drift State Logic
+            // To drift: Must be moving fast enough + Braking + Turning
+            if (keys.brake && Math.abs(speed) > MIN_DRIFT_SPEED && Math.abs(turnInput) > 0.1) {
                 isDrifting = true;
                 
-                // PHYSICS: Centrifugal Force
-                // F = mv^2/r. The faster you go, the more you want to slide out.
-                // We square the speed so entering fast results in a HUGE slide.
-                const centrifugalFactor = (speed * speed) * turnInput; 
+                // PHYSICS: Lateral Breakout Force
+                // The faster you go, the harder the rear swings out (Centrifugal).
+                // We add to lateralVelocity (Local X axis) to push the bike sideways.
+                // Note: Turning Left (Positive Input) -> Slide Right (Positive Lateral)
+                const breakoutForce = (speed * speed) * turnInput * 0.18;
+                lateralVelocity += breakoutForce;
+
+                // PHYSICS: Oversteer Yaw
+                // The bike points into the turn faster than it travels.
+                bikeGroup.rotation.y += turnInput * 0.08;
                 
-                // PHYSICS: Initiation "Kick"
-                // If you snap the steering (high turnDelta), you upset the balance more.
-                // This simulates the "Scandinavian Flick".
-                const kickFactor = turnDelta * speed * 2.0 * Math.sign(turnInput);
-                
-                // Add these forces to our lateral velocity.
-                // We multiply by 0.1 to scale it to frame-by-frame physics.
-                lateralVelocity += (centrifugalFactor + kickFactor) * 0.15;
-                
-                // VISUALS: Oversteer
-                // When drifting, the car rotates faster than it actually changes direction.
-                bikeGroup.rotation.y += turnInput * 0.09; 
-                
-                // Slightly preserve speed (Slide instead of stop)
-                speed *= 0.97;
+                // Drag: Drifting scrubs speed, but less than full braking
+                speed *= 0.99; 
+
             } else {
+                // GRIP MODE
                 isDrifting = false;
-                // Normal Braking (if not drifting)
+                
+                // Standard Braking
                 if(keys.brake) speed *= BRAKE_FRICTION;
                 
-                // Regain Traction: Lateral velocity decays quickly when not drifting
-                lateralVelocity *= 0.85; 
+                // Lateral Grip: Side speed dies quickly (tires bite)
+                lateralVelocity *= GRIP_FRICTION;
                 
-                // Normal Turning
-                if (Math.abs(speed) > 0.05) bikeGroup.rotation.y += turnInput * TURN_SPEED;
+                // Standard Turning
+                if (Math.abs(speed) > 0.05) {
+                    // Turn rate decreases slightly at high speed (stability)
+                    const speedFactor = 1.0 - (Math.abs(speed) * 0.3);
+                    bikeGroup.rotation.y += turnInput * TURN_SPEED * speedFactor;
+                }
             }
             
-            if(!keys.brake) speed *= FRICTION; // Rolling resistance
+            // Rolling Resistance
+            if(!keys.brake) speed *= FRICTION;
 
-            // Apply Lateral Friction (Tires resisting slide)
-            lateralVelocity *= 0.96;
+            // Apply Drift Sustain
+            // If we are drifting, friction is low, so we keep sliding.
+            if (isDrifting) lateralVelocity *= DRIFT_FRICTION;
 
             if (bikeGroup) {
-                const nextVel = new THREE.Vector3(0, 0, speed); 
-                nextVel.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                const nextX = bikeGroup.position.x + nextVel.x; 
-                const nextZ = bikeGroup.position.z + nextVel.z;
+                // 3. Apply Velocity Vectors
+                // Forward Vector
+                const forwardVec = new THREE.Vector3(0, 0, speed);
+                // Lateral (Slide) Vector
+                const sideVec = new THREE.Vector3(lateralVelocity, 0, 0);
+                
+                // Combine and Rotate to World Space
+                const totalVec = new THREE.Vector3().addVectors(forwardVec, sideVec);
+                totalVec.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
+                
+                // Move Bike
+                const nextX = bikeGroup.position.x + totalVec.x; 
+                const nextZ = bikeGroup.position.z + totalVec.z;
 
-                // APPLY LATERAL SLIDE
-                // We slide along the local X axis. 
-                // Note: lateralVelocity is signed based on turnInput (Left Turn + -> Slide Right +)
-                // We actually want the car to slide "out" of the turn.
-                // If turning Left (+ rotation), centrifugal force pushes Right (- local X? No, + local X depends on mesh orientation).
-                // Let's assume standard ThreeJS: +X is Right.
-                // Left Turn (Positive Rot) -> Push Right (Positive X)
-                bikeGroup.translateX(lateralVelocity);
-
-                // Create Smoke if sliding hard
+                // Create Smoke
                 if (Math.abs(lateralVelocity) > 0.05 && frameCount % 3 === 0) {
                     createDriftSmoke(Math.abs(lateralVelocity));
                 }
@@ -921,56 +909,60 @@
                 if (checkCollisions(nextX, nextZ)) { 
                     speed = -speed * 0.5; sfx.playLand(1.0); 
                 } else { 
-                    velocity.set(0, 0, speed); 
-                    velocity.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y); 
-                    bikeGroup.position.add(velocity); 
+                    bikeGroup.position.add(totalVec);
                 }
 
-                // REMOVED "speed = 0" SO WALLS ARE LESS JARRING
-                if (bikeGroup.position.x > MAP_LIMIT) { bikeGroup.position.x = MAP_LIMIT; }
-                if (bikeGroup.position.x < -MAP_LIMIT) { bikeGroup.position.x = -MAP_LIMIT; }
-                if (bikeGroup.position.z > MAP_LIMIT) { bikeGroup.position.z = MAP_LIMIT; }
-                if (bikeGroup.position.z < -MAP_LIMIT) { bikeGroup.position.z = -MAP_LIMIT; }
+                // REMOVED WALLS (Infinite Map)
 
                 sfx.updateEngine(Math.abs(speed), isDrifting);
                 checkRings();
                 updateBattery();
 
+                // Terrain Following
                 const groundH = getTerrainHeight(bikeGroup.position.x, bikeGroup.position.z);
                 verticalVelocity -= GRAVITY; 
                 bikeGroup.position.y += verticalVelocity;
 
-                // REINFORCED GROUND CLAMP
                 if (bikeGroup.position.y < groundH) { 
                     bikeGroup.position.y = groundH; 
                     verticalVelocity = 0; 
                 }
-                if (bikeGroup.position.y < groundH) {
-                    bikeGroup.position.y = groundH;
-                }
 
+                // Pitch Matching (Slope)
                 const aheadV = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                const nextXPos = bikeGroup.position.x + aheadV.x; 
-                const nextZPos = bikeGroup.position.z + aheadV.z; 
-                const nextH = getTerrainHeight(nextXPos, nextZPos);
-                
+                const nextH = getTerrainHeight(bikeGroup.position.x + aheadV.x, bikeGroup.position.z + aheadV.z);
                 const angle = Math.atan2(nextH - groundH, 1.0); 
                 bikeGroup.rotation.x = THREE.MathUtils.lerp(bikeGroup.rotation.x, -angle, 0.2);
                 
-                const targetRoll = turnInput * 0.3; 
-                bikeGroup.rotation.z = THREE.MathUtils.lerp(bikeGroup.rotation.z, targetRoll, 0.1);
+                // VISUALS: REALISTIC MOTO LEAN (Roll)
+                // Bikes lean INTO the turn. 
+                // Lean is proportional to Turn Input AND Speed.
+                let targetLean = -turnInput * 0.6 * (Math.abs(speed) / MAX_SPEED);
+                
+                // If drifting, we might counter-lean or wobble slightly to show instability
+                if (isDrifting) {
+                    targetLean *= 1.2; // Deep lean
+                    // Add slight instability wobble
+                    targetLean += Math.sin(time * 0.015) * 0.05;
+                }
+                
+                bikeGroup.rotation.z = THREE.MathUtils.lerp(bikeGroup.rotation.z, targetLean, 0.1);
 
+                // CAMERA PHYSICS
                 const targetPos = bikeGroup.position.clone();
                 let camOffset = new THREE.Vector3();
                 let lookOffset = new THREE.Vector3(0, 1, 0);
 
-                // --- 2 CAMERA MODES LOGIC ---
                 switch(activeCameraMode) {
                     case 0: // Chase Standard
                         camOffset.set(0, 4, -8);
                         camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
+                        // Add slight lag to camera during drift to emphasize the slide
+                        if (isDrifting) {
+                            camOffset.x -= lateralVelocity * 5.0; // Camera swings out opposite to slide
+                        }
                         break;
-                    case 1: // Top Down (Relative)
+                    case 1: // Top Down
                         camOffset.set(0, 25, -2);
                         camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
                         break;
