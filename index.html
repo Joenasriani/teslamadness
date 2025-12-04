@@ -39,7 +39,7 @@
             max-width: 50%;
             display: flex;
             flex-direction: column;
-            gap: 15px; /* MODIFIED: Increased gap for clear spacing */
+            gap: 15px; 
         }
         
         h1 { 
@@ -284,8 +284,8 @@
         let scene, camera, renderer;
         let bikeGroup, terrainMesh;
         let speed = 0;
-        let lateralVelocity = 0; // NEW: Track sideways drift speed
-        let lastTurnInput = 0;   // NEW: Track steering change for snap-oversteer
+        let lateralVelocity = 0; 
+        let lastTurnInput = 0;   
         
         let velocity = new THREE.Vector3();
         let verticalVelocity = 0; 
@@ -311,7 +311,6 @@
         const BRAKE_FRICTION = 0.92; 
         const TURN_SPEED = 0.04;
         const GRAVITY = 0.04; 
-        // const MAP_LIMIT = 195; // REMOVED FOR INFINITE FEEL
         
         const keys = { w: false, a: false, s: false, d: false, space: false, brake: false };
         
@@ -430,25 +429,22 @@
 
                 // --- MODIFIED SKID AUDIO CHAIN ---
                 this.skidOsc = this.ctx.createOscillator();
-                this.skidOsc.type = 'sawtooth'; // Sawtooth for growl
-                this.skidOsc.frequency.value = 35; // Deep sub-bass start
+                this.skidOsc.type = 'sawtooth'; 
+                this.skidOsc.frequency.value = 35; 
                 
-                // Add specific filter for skid to make it "fat" (cut highs)
                 this.skidFilter = this.ctx.createBiquadFilter();
                 this.skidFilter.type = 'lowpass';
-                this.skidFilter.frequency.value = 250; // Dark tone
+                this.skidFilter.frequency.value = 250; 
                 
                 this.skidGain = this.ctx.createGain();
                 this.skidGain.gain.value = 0;
                 
-                // Connect: Osc -> Filter -> Gain -> Out
                 this.skidOsc.connect(this.skidFilter);
                 this.skidFilter.connect(this.skidGain);
                 this.skidGain.connect(this.ctx.destination);
                 
                 this.skidOsc.start();
 
-                // --- MODIFIED: MUSIC PLAYLIST SETUP ---
                 const playlist = [
                     "Cybertruking.mp3",
                     "cybertruck.mp3",
@@ -462,7 +458,6 @@
                 this.bgm.loop = true;
                 this.bgm.volume = 0.6;
                 
-                // Error handling in case file doesn't exist
                 this.bgm.addEventListener('error', (e) => {
                     console.warn("Music file not found: music/" + randomTrack);
                 });
@@ -471,7 +466,6 @@
             playMusic: function() {
                 if (this.bgm && this.isMusicOn && this.bgm.paused) {
                     this.bgm.play().catch(e => {
-                        // console.log("Music failed to play (expected if file missing)");
                     });
                 }
             },
@@ -499,7 +493,6 @@
                 } else {
                     btn.innerText = "SFX: OFF";
                     btn.classList.add('off');
-                    // Mute current loops immediately
                     if(this.engineGain) this.engineGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
                     if(this.skidGain) this.skidGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
                 }
@@ -514,11 +507,8 @@
                 this.filter.frequency.setTargetAtTime(100 + (speedPercent * 600), this.ctx.currentTime, 0.1);
 
                 if(isSkidding) {
-                    // FAT BASS DRIFT SOUND
-                    this.skidGain.gain.setTargetAtTime(0.25, this.ctx.currentTime, 0.1); // Louder presence
-                    // Low frequency rumble (30-60Hz) with random jitter for texture
+                    this.skidGain.gain.setTargetAtTime(0.25, this.ctx.currentTime, 0.1); 
                     this.skidOsc.frequency.setTargetAtTime(35 + Math.random()*25, this.ctx.currentTime, 0.05); 
-                    // Open filter slightly with speed but keep it dark
                     this.skidFilter.frequency.setTargetAtTime(200 + (speedPercent * 150), this.ctx.currentTime, 0.1);
                 } else {
                     this.skidGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
@@ -542,7 +532,7 @@
                 osc.type = 'square';
                 osc.frequency.setValueAtTime(220, this.ctx.currentTime);
                 osc.frequency.exponentialRampToValueAtTime(440, this.ctx.currentTime + 0.1);
-                // MODIFIED: Reduced volume from 0.3 to 0.12 (60% reduction)
+                // Reduced volume to 40% (0.12)
                 gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
                 osc.connect(gain); gain.connect(this.ctx.destination);
@@ -570,7 +560,7 @@
             loadModels();
 
             window.addEventListener('resize', onWindowResize);
-            // MODIFIED: Added spacebar mapping logic in onKey
+            // Spacebar map added
             document.addEventListener('keydown', (e) => { onKey(e, true); sfx.init(); sfx.playMusic(); });
             document.addEventListener('keyup', (e) => onKey(e, false));
             
@@ -600,13 +590,32 @@
              if(text) { text.innerText = "ERROR: " + name + " NOT FOUND. USING FALLBACK."; text.className = "error-msg"; }
         }
 
+        // --- MATH OPTIMIZED HEIGHT FUNCTION (NO RAYCASTER) ---
+        // Returns the exact Y height of the terrain at x, z
+        function calculateTerrainHeight(x, z) {
+            // Must match the createTerrain formula exactly
+            const y = (Math.sin(x * 0.03) * 5) + 
+                      (Math.cos(z * 0.03) * 5) + 
+                      (Math.sin(x * 0.1 + z * 0.1) * 1.5);
+            
+            const dist = Math.sqrt(x*x + z*z); 
+            let bowl = 0; 
+            if(dist > 100) bowl = (dist - 100) * 0.15;
+            
+            return y + bowl;
+        }
+
+        function getTerrainHeight(x, z) {
+            // Replaces the slow raycaster with fast math
+            return calculateTerrainHeight(x, z);
+        }
+
         function createRings() {
             const geo = new THREE.TorusGeometry(0.8, 0.15, 8, 16);
             const mat = new THREE.MeshStandardMaterial({ 
                 color: 0xFFFF00, metalness: 0.1, roughness: 0.2, emissive: 0xFFFF00, emissiveIntensity: 0.8
             });
 
-            // MODIFIED: Increased spread for larger map
             for(let i=0; i<60; i++) {
                 const ring = new THREE.Mesh(geo, mat);
                 const x = (Math.random() - 0.5) * 4000;
@@ -636,25 +645,21 @@
             }, (xhr) => { if (xhr.lengthComputable) { progressMoto = (xhr.loaded / xhr.total) * 100; updateProgress(); } else { progressMoto = 50; updateProgress(); }
             }, (error) => { console.warn("Moto FBX missing."); reportError("moto.fbx"); createFallbackBike(); assetsLoaded++; checkLoading(); });
 
-            // 2. High Res Procedural Trees
+            // 2. High Res Procedural Trees (MATH OPTIMIZED)
             createHighResTrees();
 
             createRocks();
-            // Removed createFences call
         }
 
         function createHighResTrees() {
-            // MODIFIED: Increased count to 3000 for denser environment
-            const count = 15000; // Increased even more
+            const count = 15000; // 15k trees
             const dummy = new THREE.Object3D();
             
-            // Trunk: Detailed cylinder
             const trunkGeo = new THREE.CylinderGeometry(0.3, 0.5, 2.5, 8); 
-            trunkGeo.translate(0, 1.25, 0); // Pivot at bottom
+            trunkGeo.translate(0, 1.25, 0); 
             const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5C4033, roughness: 0.9 });
             const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
 
-            // Foliage: Stack of 3 high-res cones
             const c1 = new THREE.ConeGeometry(2.0, 2.5, 8); c1.translate(0, 3.0, 0);
             const c2 = new THREE.ConeGeometry(1.6, 2.2, 8); c2.translate(0, 4.2, 0);
             const c3 = new THREE.ConeGeometry(1.0, 1.8, 8); c3.translate(0, 5.2, 0);
@@ -663,19 +668,14 @@
             const leafMat = new THREE.MeshStandardMaterial({ color: 0x228B22, roughness: 0.8, flatShading: false });
             const leafMesh = new THREE.InstancedMesh(leafGeo, leafMat, count);
 
-            // Set Shadows & Frustum
             trunkMesh.castShadow = true; trunkMesh.receiveShadow = true; trunkMesh.frustumCulled = false;
             leafMesh.castShadow = true; leafMesh.receiveShadow = true; leafMesh.frustumCulled = false;
 
             for(let i=0; i<count; i++) {
-                // Random position
-                // MODIFIED: Increased spread for "no ending" feel
                 const x = (Math.random() - 0.5) * 9500; 
                 const z = (Math.random() - 0.5) * 9500;
                 
-                // Clear center spawn area
                 if(Math.abs(x) < 25 && Math.abs(z) < 25) { 
-                    // Hide under map if in spawn
                     dummy.position.set(0, -100, 0); 
                     dummy.updateMatrix();
                     trunkMesh.setMatrixAt(i, dummy.matrix);
@@ -683,10 +683,9 @@
                     continue; 
                 }
 
-                const y = getTerrainHeight(x, z);
+                // OPTIMIZATION: Use pure math instead of raycaster
+                const y = calculateTerrainHeight(x, z);
                 
-                // Random Scale (respecting game proportions)
-                // Base size fits the ~1 unit long bike
                 const scale = 0.8 + Math.random() * 0.8; 
                 
                 dummy.position.set(x, y, z);
@@ -697,14 +696,12 @@
                 trunkMesh.setMatrixAt(i, dummy.matrix);
                 leafMesh.setMatrixAt(i, dummy.matrix);
                 
-                // Add to collision
                 obstacles.push({ x: x, z: z, radius: 1.5 * scale });
             }
             
             scene.add(trunkMesh);
             scene.add(leafMesh);
             
-            // Mark trees as "loaded"
             assetsLoaded++;
             checkLoading();
         }
@@ -729,17 +726,21 @@
                 const end = (e) => { e.preventDefault(); keys[key] = false; btn.classList.remove('active'); };
                 btn.addEventListener('touchstart', start, { passive: false }); btn.addEventListener('touchend', end, { passive: false });
             };
-            // No buttons anymore, just zones
         }
 
         function createTerrain() {
-            // MODIFIED: Increased plane size to 10000x10000 for seamless infinite feel
-            const geometry = new THREE.PlaneGeometry(10000, 10000, 500, 500); geometry.rotateX(-Math.PI / 2); const positions = geometry.attributes.position.array;
+            // 500x500 segments = 250,000 vertices (Fast to render, slow to raycast)
+            const geometry = new THREE.PlaneGeometry(10000, 10000, 500, 500); 
+            geometry.rotateX(-Math.PI / 2); 
+            const positions = geometry.attributes.position.array;
+            
             for (let i = 0; i < positions.length; i += 3) {
-                const x = positions[i]; const z = positions[i + 2];
-                const y = (Math.sin(x * 0.03) * 5) + (Math.cos(z * 0.03) * 5) + (Math.sin(x * 0.1 + z * 0.1) * 1.5) + (Math.random() * 0.2);
-                const dist = Math.sqrt(x*x + z*z); let bowl = 0; if(dist > 100) bowl = (dist - 100) * 0.15; positions[i + 1] = y + bowl;
+                const x = positions[i]; 
+                const z = positions[i + 2];
+                // Use the exact same formula, NO RANDOMNESS for deterministic match
+                positions[i + 1] = calculateTerrainHeight(x, z);
             }
+            
             geometry.computeVertexNormals();
             const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 1024; const ctx = canvas.getContext('2d');
             ctx.fillStyle = '#3E2712'; ctx.fillRect(0,0,1024,1024);
@@ -748,17 +749,13 @@
                 const x = Math.random() * 1024; const y = Math.random() * 1024; const size = Math.random() * 3 + 1; ctx.fillRect(x, y, size, size);
             }
             const tex = new THREE.CanvasTexture(canvas); tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; 
-            // MODIFIED: Increased repeats so texture doesn't stretch
             tex.repeat.set(100, 100);
             const material = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 });
             terrainMesh = new THREE.Mesh(geometry, material); terrainMesh.receiveShadow = true; scene.add(terrainMesh);
         }
 
-        function getTerrainHeight(x, z) { const raycaster = new THREE.Raycaster(); raycaster.set(new THREE.Vector3(x, 100, z), new THREE.Vector3(0, -1, 0)); const intersects = raycaster.intersectObject(terrainMesh); return intersects.length > 0 ? intersects[0].point.y : 0; }
-        
         function createRocks() {
              const rockGeo = new THREE.DodecahedronGeometry(1, 0); const rockMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.9 });
-            // MODIFIED: Increased rocks for large map
             for(let i=0; i< 200; i++) { 
                 const x = (Math.random() - 0.5) * 9000; 
                 const z = (Math.random() - 0.5) * 9000; 
@@ -775,8 +772,7 @@
         
         function createDriftSmoke(intensity) {
             if(!bikeGroup) return; 
-            // Create smoke at rear wheel position
-            const offset = new THREE.Vector3(0, 0.2, 0.5); // Slightly behind center
+            const offset = new THREE.Vector3(0, 0.2, 0.5); 
             offset.applyMatrix4(bikeGroup.matrixWorld);
             
             const geo = new THREE.DodecahedronGeometry(0.3 * Math.min(intensity * 3, 2.0), 0);
@@ -784,16 +780,13 @@
             const p = new THREE.Mesh(geo, mat);
             
             p.position.copy(offset);
-            // Add some random spread
             p.position.x += (Math.random() - 0.5) * 0.5;
             p.position.z += (Math.random() - 0.5) * 0.5;
             
-            // Ground clamp
             const gH = getTerrainHeight(p.position.x, p.position.z);
             if(p.position.y < gH) p.position.y = gH + 0.1;
             
             scene.add(p);
-            // Drift smoke lasts longer and grows bigger based on intensity
             particles.push({ mesh: p, life: 1.5 + intensity, isSmoke: true });
         }
 
@@ -805,13 +798,12 @@
             for (let i = particles.length - 1; i >= 0; i--) { 
                 const p = particles[i]; 
                 p.life -= 0.02; 
-                p.mesh.position.y += 0.03; // Smoke rises
+                p.mesh.position.y += 0.03; 
                 
                 if (p.isSmoke) {
-                    p.mesh.scale.multiplyScalar(1.03); // Smoke expands
+                    p.mesh.scale.multiplyScalar(1.03); 
                     p.mesh.material.opacity = p.life * 0.5;
                 } else {
-                    // Dust
                     p.mesh.position.y += 0.02; 
                     p.mesh.scale.multiplyScalar(1.05); 
                     p.mesh.material.opacity = p.life * 0.4; 
@@ -830,7 +822,6 @@
             if (k === 's' || k === 'arrowdown') keys.s = pressed; 
             if (k === 'a' || k === 'arrowleft') keys.a = pressed; 
             if (k === 'd' || k === 'arrowright') keys.d = pressed; 
-            // MODIFIED: Map Space to Brake for Desktop Drift
             if (k === ' ') keys.brake = pressed; 
         }
         
@@ -853,7 +844,7 @@
             const playerPos = bikeGroup.position;
             for(let i = rings.length - 1; i >= 0; i--) {
                 const ring = rings[i];
-                ring.rotation.y += 0.05; // Spin animation
+                ring.rotation.y += 0.05; 
                 const dx = playerPos.x - ring.position.x;
                 const dy = (playerPos.y + 0.5) - ring.position.y; 
                 const dz = playerPos.z - ring.position.z;
@@ -871,15 +862,13 @@
                 if (battery < 0) battery = 0;
             }
             
-            // UI Update
             const bar = document.getElementById('battery-bar');
             const txt = document.getElementById('battery-text');
             bar.style.width = battery + "%";
             txt.innerText = "BATTERY: " + Math.round(battery) + "%";
             
-            // Speed Limit if Battery Low
             if (battery <= 0) {
-                speed *= 0.95; // Slow to stop
+                speed *= 0.95; 
             }
         }
 
@@ -900,82 +889,52 @@
 
             // --- ADVANCED MOTO DRIFT PHYSICS 4.0 (REALISM UPDATE) ---
             
-            // 1. Input Smoothing
             const turnDelta = turnInput - lastTurnInput;
             lastTurnInput = turnInput;
 
             let isDrifting = false;
 
-            // Physics Constants - TUNED FOR REALISM
             const MIN_DRIFT_SPEED = 0.25;
-            // GRIP_FRICTION: How fast side-speed dies when you let go of brake. 
-            // 0.90 means it snaps back to straight reasonably fast but not instantly.
             const GRIP_FRICTION = 0.90;  
-            // DRIFT_FRICTION: Resistance while sliding. 
-            // Lowered from 0.985 to 0.92 to stop the "infinite slide" ice effect.
             const DRIFT_FRICTION = 0.92; 
 
-            // 2. Drift State Logic
-            // To drift: Must be moving fast enough + Braking + Turning
             if (keys.brake && Math.abs(speed) > MIN_DRIFT_SPEED && Math.abs(turnInput) > 0.1) {
                 isDrifting = true;
                 
-                // PHYSICS: Lateral Breakout Force
-                // Reduced significantly (0.18 -> 0.025). 
-                // This adds side-force every frame. A lower value prevents the vehicle 
-                // from accelerating sideways unrealistically fast.
                 const breakoutForce = (speed * speed) * turnInput * 0.025;
                 lateralVelocity += breakoutForce;
 
-                // PHYSICS: Oversteer Yaw
-                // The bike points into the turn faster than it travels.
                 bikeGroup.rotation.y += turnInput * 0.06;
                 
-                // Drag: Drifting scrubs speed drastically in real life.
-                // Lowered from 0.99 to 0.96 to simulate tire scrub friction.
                 speed *= 0.96; 
 
             } else {
-                // GRIP MODE
                 isDrifting = false;
                 
-                // Standard Braking
                 if(keys.brake) speed *= BRAKE_FRICTION;
                 
-                // Lateral Grip: Side speed dies quickly (tires bite)
                 lateralVelocity *= GRIP_FRICTION;
                 
-                // Standard Turning
                 if (Math.abs(speed) > 0.05) {
-                    // Turn rate decreases slightly at high speed (stability)
                     const speedFactor = 1.0 - (Math.abs(speed) * 0.3);
                     bikeGroup.rotation.y += turnInput * TURN_SPEED * speedFactor;
                 }
             }
             
-            // Rolling Resistance
             if(!keys.brake) speed *= FRICTION;
 
-            // Apply Drift Sustain
-            // Friction is applied to lateral velocity every frame.
             if (isDrifting) lateralVelocity *= DRIFT_FRICTION;
 
             if (bikeGroup) {
-                // 3. Apply Velocity Vectors
-                // Forward Vector
                 const forwardVec = new THREE.Vector3(0, 0, speed);
-                // Lateral (Slide) Vector
                 const sideVec = new THREE.Vector3(lateralVelocity, 0, 0);
                 
-                // Combine and Rotate to World Space
                 const totalVec = new THREE.Vector3().addVectors(forwardVec, sideVec);
                 totalVec.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
                 
-                // Move Bike
                 const nextX = bikeGroup.position.x + totalVec.x; 
                 const nextZ = bikeGroup.position.z + totalVec.z;
 
-                // Create Smoke
                 if (Math.abs(lateralVelocity) > 0.05 && frameCount % 3 === 0) {
                     createDriftSmoke(Math.abs(lateralVelocity));
                 }
@@ -991,6 +950,7 @@
                 updateBattery();
 
                 // Terrain Following
+                // Use fast math here too
                 const groundH = getTerrainHeight(bikeGroup.position.x, bikeGroup.position.z);
                 verticalVelocity -= GRAVITY; 
                 bikeGroup.position.y += verticalVelocity;
@@ -1000,27 +960,20 @@
                     verticalVelocity = 0; 
                 }
 
-                // Pitch Matching (Slope)
                 const aheadV = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
                 const nextH = getTerrainHeight(bikeGroup.position.x + aheadV.x, bikeGroup.position.z + aheadV.z);
                 const angle = Math.atan2(nextH - groundH, 1.0); 
                 bikeGroup.rotation.x = THREE.MathUtils.lerp(bikeGroup.rotation.x, -angle, 0.2);
                 
-                // VISUALS: REALISTIC MOTO LEAN (Roll)
-                // Bikes lean INTO the turn. 
-                // Lean is proportional to Turn Input AND Speed.
                 let targetLean = -turnInput * 0.6 * (Math.abs(speed) / MAX_SPEED);
                 
-                // If drifting, we might counter-lean or wobble slightly to show instability
                 if (isDrifting) {
-                    targetLean *= 1.2; // Deep lean
-                    // Add slight instability wobble
+                    targetLean *= 1.2; 
                     targetLean += Math.sin(time * 0.015) * 0.05;
                 }
                 
                 bikeGroup.rotation.z = THREE.MathUtils.lerp(bikeGroup.rotation.z, targetLean, 0.1);
 
-                // CAMERA PHYSICS
                 const targetPos = bikeGroup.position.clone();
                 let camOffset = new THREE.Vector3();
                 let lookOffset = new THREE.Vector3(0, 1, 0);
@@ -1029,9 +982,8 @@
                     case 0: // Chase Standard
                         camOffset.set(0, 4, -8);
                         camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bikeGroup.rotation.y);
-                        // Add slight lag to camera during drift to emphasize the slide
                         if (isDrifting) {
-                            camOffset.x -= lateralVelocity * 5.0; // Camera swings out opposite to slide
+                            camOffset.x -= lateralVelocity * 5.0; 
                         }
                         break;
                     case 1: // Top Down
