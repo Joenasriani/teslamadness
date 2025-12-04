@@ -120,6 +120,66 @@
             opacity: 0.7;
         }
 
+        /* COMPASS NAV */
+        #compass-container {
+            position: absolute;
+            top: max(80px, env(safe-area-inset-top)); 
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 40px;
+            background: rgba(0,0,0,0.6);
+            border: 2px solid #ffcc00;
+            border-radius: 50%;
+            z-index: 20;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #compass-arrow {
+            width: 0; 
+            height: 0; 
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-bottom: 20px solid #ffcc00;
+            transform-origin: bottom center;
+        }
+        #compass-label {
+            position: absolute;
+            bottom: -15px;
+            width: 100px;
+            text-align: center;
+            font-size: 10px;
+            color: #ffcc00;
+            text-shadow: 1px 1px 0 #000;
+        }
+
+        /* EXPANDED MAP OVERLAY */
+        #map-overlay {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80vmin;
+            height: 80vmin;
+            background: rgba(0, 20, 0, 0.95);
+            border: 2px solid #ffcc00;
+            z-index: 150;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #big-map-canvas {
+            width: 95%;
+            height: 95%;
+            background: #000;
+            border: 1px solid #333;
+        }
+        #map-toggle-btn {
+            margin-top: 10px;
+        }
+
         /* LOADING SCREEN */
         #loading {
             position: absolute;
@@ -143,32 +203,6 @@
         #progress-bar { width: 0%; height: 100%; background: #ffcc00; transition: width 0.2s; }
         #loading-text { color: #aaa; font-size: 12px; }
         .error-msg { color: #ff3333 !important; }
-
-        /* MINIMAP */
-        #minimap-container {
-            position: absolute;
-            bottom: max(20px, env(safe-area-inset-bottom));
-            right: max(20px, env(safe-area-inset-right));
-            width: 150px;
-            height: 150px;
-            background: rgba(0, 0, 0, 0.8);
-            border: 2px solid #ffcc00;
-            border-radius: 8px;
-            z-index: 90;
-            pointer-events: none;
-            overflow: hidden;
-        }
-        #minimap-canvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-        #objective-text {
-            margin-top: 5px;
-            font-size: 10px;
-            color: #aaa;
-            text-align: right;
-        }
 
         /* --- MOBILE CONTROLS --- */
         .touch-controls {
@@ -295,6 +329,7 @@
         <div id="fps">60 FPS</div>
         
         <!-- BUTTONS -->
+        <div id="map-toggle-btn" class="hud-btn">MAP</div>
         <div id="camera-indicator" class="hud-btn">CAM: FAR CHASE</div>
         <div id="music-indicator" class="hud-btn">MUSIC: ON</div>
         <div id="sfx-indicator" class="hud-btn">SFX: ON</div>
@@ -302,9 +337,16 @@
         <div id="objective-text">RINGS: 0 / 500</div>
     </div>
 
-    <!-- MINIMAP -->
-    <div id="minimap-container">
-        <canvas id="minimap-canvas" width="150" height="150"></canvas>
+    <!-- COMPASS NAV -->
+    <div id="compass-container">
+        <div id="compass-arrow"></div>
+        <div id="compass-label">NEAREST RING</div>
+    </div>
+
+    <!-- EXPANDED MAP OVERLAY -->
+    <div id="map-overlay">
+        <canvas id="big-map-canvas" width="600" height="600"></canvas>
+        <div class="hud-btn" style="margin-top:10px; cursor:pointer;" id="close-map-btn">CLOSE MAP</div>
     </div>
 
     <!-- CONTROLS -->
@@ -368,8 +410,9 @@
         const EXIT_POS = { x: 4500, z: 4500 }; 
         const MAP_SIZE = 10000; // Match terrain size
 
-        const minimapCanvas = document.getElementById('minimap-canvas');
-        const mapCtx = minimapCanvas.getContext('2d');
+        let isMapOpen = false;
+        const bigMapCanvas = document.getElementById('big-map-canvas');
+        const bigMapCtx = bigMapCanvas.getContext('2d');
 
         const MAX_SPEED = 1.2;
         const ACCEL = 0.02;
@@ -640,8 +683,25 @@
             const sfxInd = document.getElementById('sfx-indicator');
             sfxInd.addEventListener('click', (e) => { e.stopPropagation(); sfx.toggleSfx(); });
 
+            const mapBtn = document.getElementById('map-toggle-btn');
+            mapBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleMap(); });
+
+            const closeMapBtn = document.getElementById('close-map-btn');
+            closeMapBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleMap(); });
+
             controls.init(); 
             animate();
+        }
+
+        function toggleMap() {
+            isMapOpen = !isMapOpen;
+            const overlay = document.getElementById('map-overlay');
+            if (isMapOpen) {
+                overlay.style.display = 'flex';
+                drawBigMap();
+            } else {
+                overlay.style.display = 'none';
+            }
         }
 
         function updateProgress() {
@@ -689,7 +749,8 @@
         }
 
         function createRings() {
-            const geo = new THREE.TorusGeometry(0.8, 0.15, 8, 16);
+            // MODIFIED: BIGGER RINGS (3.5 radius, 0.5 thick)
+            const geo = new THREE.TorusGeometry(3.5, 0.5, 16, 32);
             const mat = new THREE.MeshStandardMaterial({ 
                 color: 0xFFFF00, metalness: 0.1, roughness: 0.2, emissive: 0xFFFF00, emissiveIntensity: 0.8
             });
@@ -721,7 +782,8 @@
 
                 y = getTerrainHeight(x, z);
                 const ring = new THREE.Mesh(geo, mat);
-                ring.position.set(x, y + 0.2, z); 
+                // MODIFIED: Float higher (+3.5)
+                ring.position.set(x, y + 3.5, z); 
                 ring.rotation.y = Math.random() * Math.PI;
                 ring.castShadow = true;
                 scene.add(ring);
@@ -952,7 +1014,8 @@
                 const dz = playerPos.z - ring.position.z;
                 const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
 
-                if (dist < 2.0) {
+                // MODIFIED: INCREASED HITBOX TO 5.0 (easier to hit)
+                if (dist < 5.0) {
                     scene.remove(ring); 
                     rings.splice(i, 1); 
                     collectedCount++;
@@ -971,6 +1034,7 @@
                     exitBeacon.visible = true;
                     document.getElementById('rings-status').innerText = "TARGET UNLOCKED: GO TO GREEN BEACON!";
                     document.getElementById('rings-status').classList.add('accent');
+                    document.getElementById('compass-label').innerText = "TARGET";
                 }
             }
 
@@ -1001,50 +1065,96 @@
             }
         }
 
-        function drawMinimap() {
-            mapCtx.clearRect(0, 0, 150, 150);
-            
-            // Map world coords (-5000 to 5000) to (0 to 150)
-            const mapScale = 150 / MAP_SIZE;
-            const centerOffset = 75; // 150/2
-
-            // Draw Exit if unlocked
-            if(exitUnlocked) {
-                mapCtx.fillStyle = '#00ff00';
-                const exX = (EXIT_POS.x * mapScale) + centerOffset;
-                const exY = (EXIT_POS.z * mapScale) + centerOffset;
-                mapCtx.beginPath();
-                mapCtx.arc(exX, exY, 4, 0, Math.PI * 2);
-                mapCtx.fill();
-            }
+        function drawBigMap() {
+            if (!isMapOpen) return;
+            // Draw once per frame when open
+            bigMapCtx.clearRect(0, 0, 600, 600);
+            const mapScale = 600 / MAP_SIZE;
+            const centerOffset = 300; 
 
             // Draw Rings
-            mapCtx.fillStyle = '#ffcc00';
+            bigMapCtx.fillStyle = '#ffcc00';
             for(let ring of rings) {
                 const rx = (ring.position.x * mapScale) + centerOffset;
                 const ry = (ring.position.z * mapScale) + centerOffset;
-                mapCtx.beginPath();
-                mapCtx.rect(rx-1, ry-1, 2, 2);
-                mapCtx.fill();
+                bigMapCtx.beginPath();
+                bigMapCtx.arc(rx, ry, 3, 0, Math.PI*2); // Bigger dots
+                bigMapCtx.fill();
+            }
+
+            // Draw Exit
+            if(exitUnlocked) {
+                bigMapCtx.fillStyle = '#00ff00';
+                const exX = (EXIT_POS.x * mapScale) + centerOffset;
+                const exY = (EXIT_POS.z * mapScale) + centerOffset;
+                bigMapCtx.beginPath();
+                bigMapCtx.arc(exX, exY, 10, 0, Math.PI*2);
+                bigMapCtx.fill();
+                bigMapCtx.fillStyle = '#00ff00';
+                bigMapCtx.font = "14px monospace";
+                bigMapCtx.fillText("EXIT", exX + 15, exY + 5);
             }
 
             // Draw Player
             if(bikeGroup) {
-                mapCtx.fillStyle = '#ffffff';
+                bigMapCtx.fillStyle = '#ffffff';
                 const px = (bikeGroup.position.x * mapScale) + centerOffset;
                 const py = (bikeGroup.position.z * mapScale) + centerOffset;
                 
-                // Draw Arrow
-                mapCtx.save();
-                mapCtx.translate(px, py);
-                mapCtx.rotate(-bikeGroup.rotation.y); // Rotate opposite to mesh to show direction
-                mapCtx.beginPath();
-                mapCtx.moveTo(0, -3);
-                mapCtx.lineTo(2, 2);
-                mapCtx.lineTo(-2, 2);
-                mapCtx.closePath();
-                mapCtx.fill();
-                mapCtx.restore();
+                bigMapCtx.save();
+                bigMapCtx.translate(px, py);
+                bigMapCtx.rotate(-bikeGroup.rotation.y); 
+                bigMapCtx.beginPath();
+                bigMapCtx.moveTo(0, -10);
+                bigMapCtx.lineTo(8, 8);
+                bigMapCtx.lineTo(-8, 8);
+                bigMapCtx.closePath();
+                bigMapCtx.fill();
+                bigMapCtx.restore();
+            }
+            requestAnimationFrame(drawBigMap);
+        }
+
+        function updateCompass() {
+            if (!bikeGroup) return;
+            const playerPos = bikeGroup.position;
+            const playerRot = bikeGroup.rotation.y;
+            let target = null;
+
+            if (exitUnlocked) {
+                target = new THREE.Vector3(EXIT_POS.x, 0, EXIT_POS.z);
+            } else {
+                // Find nearest ring
+                let minDist = Infinity;
+                for(let r of rings) {
+                    const d = playerPos.distanceToSquared(r.position);
+                    if(d < minDist) {
+                        minDist = d;
+                        target = r.position;
+                    }
+                }
+            }
+
+            if (target) {
+                const dx = target.x - playerPos.x;
+                const dz = target.z - playerPos.z;
+                // Angle to target in world space (rads)
+                // Math.atan2(z, x) usually, but check 3JS coordinate system.
+                // In 3JS: Z is forward/back, X is left/right. 
+                // atan2(dx, dz) gives angle from North (Z) clockwise? No.
+                // Standard trig: atan2(y, x). Here: atan2(x, z).
+                const targetAngle = Math.atan2(dx, dz);
+                
+                // Relative angle = Target - Player
+                // However, player rotation Y is usually counter-clockwise from Z? 
+                // Let's adjust until it looks right.
+                // Compass Arrow Rotation needs to act like a real compass relative to screen (fixed) or car (rotating)?
+                // "Compass style directional indicator" usually means arrow points relative to car's forward.
+                
+                const relativeAngle = targetAngle - playerRot;
+                const deg = THREE.MathUtils.radToDeg(relativeAngle);
+                
+                document.getElementById('compass-arrow').style.transform = `rotate(${deg}deg)`;
             }
         }
 
@@ -1124,7 +1234,7 @@
                 sfx.updateEngine(Math.abs(speed), isDrifting);
                 checkRings();
                 updateBattery();
-                drawMinimap(); // UPDATE MAP
+                updateCompass(); // UPDATE COMPASS
 
                 // Terrain Following
                 // Use fast math here too
