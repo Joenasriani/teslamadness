@@ -443,7 +443,7 @@
 
         // GAMEPLAY STATS
         let battery = 100;
-        const BATTERY_DRAIN = 0.05; 
+        const BATTERY_DRAIN = 0.015; 
         const RING_CHARGE = 20;
 
         // --- NEW MAP & WIN LOGIC ---
@@ -686,10 +686,10 @@
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
                 osc.type = 'square';
-                osc.frequency.setValueAtTime(220, this.ctx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(440, this.ctx.currentTime + 0.1);
-                // Reduced volume to 40% (0.12)
-                gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+                osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(300, this.ctx.currentTime + 0.1);
+                // Reduced volume to 0.05
+                gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
                 osc.connect(gain); gain.connect(this.ctx.destination);
                 osc.start(); osc.stop(this.ctx.currentTime + 0.5);
@@ -987,13 +987,15 @@
             }
         }
         
+        // --- MODIFIED: LOWER OPACITY, SAND-LIKE PARTICLES ---
         function createDriftSmoke(intensity) {
             if(!bikeGroup) return; 
             const offset = new THREE.Vector3(0, 0.2, 0.5); 
             offset.applyMatrix4(bikeGroup.matrixWorld);
             
             const geo = new THREE.DodecahedronGeometry(0.3 * Math.min(intensity * 3, 2.0), 0);
-            const mat = new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.6 });
+            // Lower opacity (0.15) for sandy dust look
+            const mat = new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.15 });
             const p = new THREE.Mesh(geo, mat);
             
             p.position.copy(offset);
@@ -1076,6 +1078,7 @@
                     collectedCount++;
                     collectedInFrame = true;
                     sfx.playCollect(); 
+                    if(navigator.vibrate) navigator.vibrate(50); // Haptic feedback
                     battery = Math.min(100, battery + RING_CHARGE);
                 }
             }
@@ -1228,7 +1231,7 @@
             
             let turnInput = 0; if (keys.a) turnInput += 1; if (keys.d) turnInput -= 1; turnInput += analogSteering; 
 
-            // --- ADVANCED MOTO DRIFT PHYSICS 4.0 (REALISM UPDATE) ---
+            // --- ADVANCED MOTO DRIFT PHYSICS 5.0 (SMOOTH & DYNAMIC) ---
             
             const turnDelta = turnInput - lastTurnInput;
             lastTurnInput = turnInput;
@@ -1237,17 +1240,42 @@
 
             const MIN_DRIFT_SPEED = 0.25;
             const GRIP_FRICTION = 0.90;  
-            const DRIFT_FRICTION = 0.92; 
+            const DRIFT_FRICTION = 0.96; // Smoother slide (less friction)
 
+            // Dynamic Drift Logic
             if (keys.brake && Math.abs(speed) > MIN_DRIFT_SPEED && Math.abs(turnInput) > 0.1) {
                 isDrifting = true;
                 
-                const breakoutForce = (speed * speed) * turnInput * 0.025;
-                lateralVelocity += breakoutForce;
-
-                bikeGroup.rotation.y += turnInput * 0.06;
+                // 1. Calculate Target Drift Velocity
+                // Instead of adding force constantly, we target a velocity proportional to speed & steer
+                // This makes it "smooth and relative"
+                const driftFactor = 0.8; // How "wide" the drift is
+                const targetLateral = -turnInput * (speed * speed) * driftFactor; // Invert turn for correct slide direction? No, stick to existing signage.
+                // Actually, standard sign: Turn Left (+) -> Slide Right (+ in local X?).
+                // Let's rely on previous sign logic: breakoutForce was += ... * turnInput.
                 
-                speed *= 0.96; 
+                // We Lerp towards the target drift velocity for smoothness
+                // But we add a kick from turnDelta (steering speed)
+                const kick = turnDelta * speed * 2.0; 
+                
+                lateralVelocity = THREE.MathUtils.lerp(lateralVelocity, (speed * turnInput * 0.6) + kick, 0.1);
+
+                // 2. Oversteer Yaw (Visual Rotation)
+                bikeGroup.rotation.y += turnInput * 0.07;
+                
+                // 3. Scrub Speed
+                speed *= 0.98; // Less drag for smoother long drifts
+
+                // --- HAPTICS ---
+                // Vibrate relative to drift intensity (lateral speed)
+                if (Math.abs(lateralVelocity) > 0.1 && navigator.vibrate) {
+                    // Pulse every 5 frames to avoid browser throttling
+                    if (frameCount % 5 === 0) {
+                        // Duration relative to slide speed (10ms to 40ms)
+                        const duration = Math.min(Math.abs(lateralVelocity) * 100, 40);
+                        navigator.vibrate(duration);
+                    }
+                }
 
             } else {
                 isDrifting = false;
@@ -1276,12 +1304,14 @@
                 const nextX = bikeGroup.position.x + totalVec.x; 
                 const nextZ = bikeGroup.position.z + totalVec.z;
 
+                // Create Smoke - visual feedback for drift
                 if (Math.abs(lateralVelocity) > 0.05 && frameCount % 3 === 0) {
                     createDriftSmoke(Math.abs(lateralVelocity));
                 }
 
                 if (checkCollisions(nextX, nextZ)) { 
                     speed = -speed * 0.5; sfx.playLand(1.0); 
+                    if(navigator.vibrate) navigator.vibrate(200); // Big crash vibe
                 } else { 
                     bikeGroup.position.add(totalVec);
                 }
