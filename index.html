@@ -295,6 +295,53 @@
             display: none;
             z-index: 200;
         }
+
+        /* --- MOBILE OVERLAP FIX --- */
+        @media screen and (max-width: 768px) {
+            #ui-layer {
+                top: max(10px, env(safe-area-inset-top));
+                left: max(10px, env(safe-area-inset-left));
+                max-width: 55%;
+                gap: 6px;
+            }
+            
+            .hud-stats {
+                top: max(10px, env(safe-area-inset-top));
+                right: max(10px, env(safe-area-inset-right));
+                max-width: 40%;
+                gap: 6px;
+            }
+
+            h1 {
+                font-size: 16px; /* Smaller title to prevent overlap */
+                white-space: normal; /* Allow wrap if necessary */
+                line-height: 1;
+            }
+
+            p {
+                font-size: 10px;
+            }
+
+            .battery-container {
+                height: 8px;
+            }
+            
+            #battery-text {
+                top: -14px;
+                font-size: 9px;
+            }
+
+            .hud-btn {
+                padding: 4px 6px;
+                font-size: 9px;
+                margin-bottom: 2px;
+            }
+
+            /* Push compass down on mobile so it doesn't hit UI */
+            #compass-container {
+                top: max(130px, env(safe-area-inset-top));
+            }
+        }
     </style>
 </head>
 <body>
