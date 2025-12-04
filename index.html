@@ -688,8 +688,8 @@
                 osc.type = 'square';
                 osc.frequency.setValueAtTime(150, this.ctx.currentTime);
                 osc.frequency.exponentialRampToValueAtTime(300, this.ctx.currentTime + 0.1);
-                // Reduced volume to 0.05
-                gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+                // MODIFIED: Reduced volume to 0.015 (Very Quiet)
+                gain.gain.setValueAtTime(0.015, this.ctx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
                 osc.connect(gain); gain.connect(this.ctx.destination);
                 osc.start(); osc.stop(this.ctx.currentTime + 0.5);
