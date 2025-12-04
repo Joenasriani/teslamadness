@@ -616,10 +616,11 @@
                 color: 0xFFFF00, metalness: 0.1, roughness: 0.2, emissive: 0xFFFF00, emissiveIntensity: 0.8
             });
 
-            for(let i=0; i<60; i++) {
+            // MODIFIED: Increased to 500 rings and 9500 spread
+            for(let i=0; i<500; i++) {
                 const ring = new THREE.Mesh(geo, mat);
-                const x = (Math.random() - 0.5) * 4000;
-                const z = (Math.random() - 0.5) * 4000;
+                const x = (Math.random() - 0.5) * 9500;
+                const z = (Math.random() - 0.5) * 9500;
                 const y = getTerrainHeight(x, z);
                 ring.position.set(x, y + 0.2, z); 
                 ring.rotation.y = Math.random() * Math.PI;
