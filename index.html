@@ -241,7 +241,7 @@
             <div id="battery-bar"></div>
             <div id="battery-text">BATTERY: 100%</div>
         </div>
-        <p>Collect Gold Rings to Recharge</p>
+        <p>Collect <span style="color: #ffcc00;">Gold Rings</span> to Recharge</p>
     </div>
 
     <!-- RIGHT HEADER -->
@@ -407,7 +407,7 @@
         };
 
         const sfx = {
-            ctx: null, engineOsc: null, engineGain: null, filter: null, noiseBuffer: null, skidOsc: null, skidGain: null, 
+            ctx: null, engineOsc: null, engineGain: null, filter: null, noiseBuffer: null, skidOsc: null, skidGain: null, skidFilter: null,
             bgm: null, isMusicOn: true, isSfxOn: true,
             
             init: function() {
@@ -428,13 +428,24 @@
                 this.engineOsc.connect(this.filter); this.filter.connect(this.engineGain); this.engineGain.connect(this.ctx.destination);
                 this.engineOsc.start();
 
+                // --- MODIFIED SKID AUDIO CHAIN ---
                 this.skidOsc = this.ctx.createOscillator();
-                this.skidOsc.type = 'sawtooth';
-                this.skidOsc.frequency.value = 80;
+                this.skidOsc.type = 'sawtooth'; // Sawtooth for growl
+                this.skidOsc.frequency.value = 35; // Deep sub-bass start
+                
+                // Add specific filter for skid to make it "fat" (cut highs)
+                this.skidFilter = this.ctx.createBiquadFilter();
+                this.skidFilter.type = 'lowpass';
+                this.skidFilter.frequency.value = 250; // Dark tone
+                
                 this.skidGain = this.ctx.createGain();
                 this.skidGain.gain.value = 0;
-                this.skidOsc.connect(this.skidGain);
+                
+                // Connect: Osc -> Filter -> Gain -> Out
+                this.skidOsc.connect(this.skidFilter);
+                this.skidFilter.connect(this.skidGain);
                 this.skidGain.connect(this.ctx.destination);
+                
                 this.skidOsc.start();
 
                 // --- MODIFIED: MUSIC PLAYLIST SETUP ---
@@ -503,8 +514,12 @@
                 this.filter.frequency.setTargetAtTime(100 + (speedPercent * 600), this.ctx.currentTime, 0.1);
 
                 if(isSkidding) {
-                    this.skidGain.gain.setTargetAtTime(0.06, this.ctx.currentTime, 0.1);
-                    this.skidOsc.frequency.setTargetAtTime(80 + Math.random()*50, this.ctx.currentTime, 0.1);
+                    // FAT BASS DRIFT SOUND
+                    this.skidGain.gain.setTargetAtTime(0.25, this.ctx.currentTime, 0.1); // Louder presence
+                    // Low frequency rumble (30-60Hz) with random jitter for texture
+                    this.skidOsc.frequency.setTargetAtTime(35 + Math.random()*25, this.ctx.currentTime, 0.05); 
+                    // Open filter slightly with speed but keep it dark
+                    this.skidFilter.frequency.setTargetAtTime(200 + (speedPercent * 150), this.ctx.currentTime, 0.1);
                 } else {
                     this.skidGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
                 }
@@ -630,7 +645,7 @@
 
         function createHighResTrees() {
             // MODIFIED: Increased count to 3000 for denser environment
-            const count = 3000; 
+            const count = 15000; // Increased even more
             const dummy = new THREE.Object3D();
             
             // Trunk: Detailed cylinder
@@ -719,7 +734,7 @@
 
         function createTerrain() {
             // MODIFIED: Increased plane size to 10000x10000 for seamless infinite feel
-            const geometry = new THREE.PlaneGeometry(10000, 10000, 200, 200); geometry.rotateX(-Math.PI / 2); const positions = geometry.attributes.position.array;
+            const geometry = new THREE.PlaneGeometry(10000, 10000, 500, 500); geometry.rotateX(-Math.PI / 2); const positions = geometry.attributes.position.array;
             for (let i = 0; i < positions.length; i += 3) {
                 const x = positions[i]; const z = positions[i + 2];
                 const y = (Math.sin(x * 0.03) * 5) + (Math.cos(z * 0.03) * 5) + (Math.sin(x * 0.1 + z * 0.1) * 1.5) + (Math.random() * 0.2);
@@ -727,9 +742,9 @@
             }
             geometry.computeVertexNormals();
             const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 1024; const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#8B5A2B'; ctx.fillRect(0,0,1024,1024);
+            ctx.fillStyle = '#3E2712'; ctx.fillRect(0,0,1024,1024);
             for(let i=0; i<50000; i++) {
-                const shade = Math.random(); if(shade > 0.6) ctx.fillStyle = '#A07040'; else if (shade > 0.3) ctx.fillStyle = '#5C4033'; else ctx.fillStyle = '#556B2F';
+                const shade = Math.random(); if(shade > 0.6) ctx.fillStyle = '#4A3218'; else if (shade > 0.3) ctx.fillStyle = '#2E1F16'; else ctx.fillStyle = '#2F3A15';
                 const x = Math.random() * 1024; const y = Math.random() * 1024; const size = Math.random() * 3 + 1; ctx.fillRect(x, y, size, size);
             }
             const tex = new THREE.CanvasTexture(canvas); tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping; 
@@ -883,7 +898,7 @@
             
             let turnInput = 0; if (keys.a) turnInput += 1; if (keys.d) turnInput -= 1; turnInput += analogSteering; 
 
-            // --- ADVANCED MOTO DRIFT PHYSICS 3.0 ---
+            // --- ADVANCED MOTO DRIFT PHYSICS 4.0 (REALISM UPDATE) ---
             
             // 1. Input Smoothing
             const turnDelta = turnInput - lastTurnInput;
@@ -891,10 +906,14 @@
 
             let isDrifting = false;
 
-            // Physics Constants
+            // Physics Constants - TUNED FOR REALISM
             const MIN_DRIFT_SPEED = 0.25;
-            const GRIP_FRICTION = 0.85;  // Tires grip road quickly when not sliding
-            const DRIFT_FRICTION = 0.985; // Tires slide like butter when drifting
+            // GRIP_FRICTION: How fast side-speed dies when you let go of brake. 
+            // 0.90 means it snaps back to straight reasonably fast but not instantly.
+            const GRIP_FRICTION = 0.90;  
+            // DRIFT_FRICTION: Resistance while sliding. 
+            // Lowered from 0.985 to 0.92 to stop the "infinite slide" ice effect.
+            const DRIFT_FRICTION = 0.92; 
 
             // 2. Drift State Logic
             // To drift: Must be moving fast enough + Braking + Turning
@@ -902,18 +921,19 @@
                 isDrifting = true;
                 
                 // PHYSICS: Lateral Breakout Force
-                // The faster you go, the harder the rear swings out (Centrifugal).
-                // We add to lateralVelocity (Local X axis) to push the bike sideways.
-                // Note: Turning Left (Positive Input) -> Slide Right (Positive Lateral)
-                const breakoutForce = (speed * speed) * turnInput * 0.18;
+                // Reduced significantly (0.18 -> 0.025). 
+                // This adds side-force every frame. A lower value prevents the vehicle 
+                // from accelerating sideways unrealistically fast.
+                const breakoutForce = (speed * speed) * turnInput * 0.025;
                 lateralVelocity += breakoutForce;
 
                 // PHYSICS: Oversteer Yaw
                 // The bike points into the turn faster than it travels.
-                bikeGroup.rotation.y += turnInput * 0.08;
+                bikeGroup.rotation.y += turnInput * 0.06;
                 
-                // Drag: Drifting scrubs speed, but less than full braking
-                speed *= 0.99; 
+                // Drag: Drifting scrubs speed drastically in real life.
+                // Lowered from 0.99 to 0.96 to simulate tire scrub friction.
+                speed *= 0.96; 
 
             } else {
                 // GRIP MODE
@@ -937,7 +957,7 @@
             if(!keys.brake) speed *= FRICTION;
 
             // Apply Drift Sustain
-            // If we are drifting, friction is low, so we keep sliding.
+            // Friction is applied to lateral velocity every frame.
             if (isDrifting) lateralVelocity *= DRIFT_FRICTION;
 
             if (bikeGroup) {
